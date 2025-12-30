@@ -306,6 +306,48 @@ export const updateProduct = async (productId, updates, newImageFiles = []) => {
   }
 };
 
+
+// ✅ NEW: Update product quantity after purchase (supports partial purchases)
+export const updateProductQuantity = async (productId, quantityPurchased) => {
+  try {
+    const productRef = doc(db, PRODUCTS_COLLECTION, productId);
+    const productDoc = await getDoc(productRef);
+    
+    if (! productDoc.exists()) {
+      throw new Error('Product not found');
+    }
+    
+    const currentQuantity = productDoc.data().quantity || 0;
+    const newQuantity = Math.max(0, currentQuantity - quantityPurchased);
+    
+    const updates = {
+      quantity: newQuantity,
+      'availability.updated_at':  serverTimestamp(),
+    };
+    
+    // If quantity reaches 0, mark as unavailable/sold
+    if (newQuantity === 0) {
+      updates['availability.is_available'] = false;
+      updates['availability.sold_at'] = serverTimestamp();
+      updates['availability.updated_at'] = serverTimestamp();
+
+    }
+    
+    await updateDoc(productRef, updates);
+    
+    console.log(`✅ Product ${productId}:  quantity ${currentQuantity} → ${newQuantity}`);
+    
+    return { 
+      previousQuantity: currentQuantity, 
+      newQuantity, 
+      isSoldOut: newQuantity === 0 
+    };
+  } catch (error) {
+    console.error('Update product quantity error:', error);
+    throw error;
+  }
+};
+
 // Mark product as sold
 export const markProductAsSold = async (productId) => {
   try {

@@ -12,7 +12,7 @@ import {
   increment,
 } from 'firebase/firestore';
 import { db } from './firebase.config';
-import { markProductAsSold } from './productService';
+import { updateProductQuantity } from './productService';
 
 const ORDERS_COLLECTION = 'orders';
 
@@ -182,7 +182,7 @@ export const completeOrder = async (orderId) => {
 
     // Mark all products as sold
     for (const product of order.products) {
-      await markProductAsSold(product. product_id);
+      await updateProductQuantity(product.product_id, product.quantity);
       
       // Update seller stats
       await updateDoc(doc(db, 'users', product.seller_id), {

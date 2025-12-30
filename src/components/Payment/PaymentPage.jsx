@@ -33,72 +33,77 @@ const PaymentPage = () => {
     setCardDetails(prev => ({ ... prev, [name]:  value }));
   };
 
-  const handlePayment = async () => {
-    setLoading(true);
+const handlePayment = async () => {
+  setLoading(true);
 
-    try {
-      let result;
+  try {
+    let result;
 
-      switch (paymentMethod) {
-        case 'upi':
-          if (!upiId. trim()) {
-            toast.error('Please enter UPI ID');
-            setLoading(false);
-            return;
-          }
-          result = await processUPIPayment(upiId, amount);
-          break;
+    switch (paymentMethod) {
+      case 'upi':
+        if (!upiId.trim()) {
+          toast.error('Please enter UPI ID');
+          setLoading(false);
+          return;
+        }
+        result = await processUPIPayment(upiId, amount);
+        break;
 
-        case 'card':
-          if (! cardDetails.number || !cardDetails.cvv) {
-            toast. error('Please fill all card details');
-            setLoading(false);
-            return;
-          }
-          result = await processCardPayment(cardDetails, amount);
-          break;
+      case 'card':
+        if (!cardDetails.number || !cardDetails.cvv) {
+          toast.error('Please fill all card details');
+          setLoading(false);
+          return;
+        }
+        result = await processCardPayment(cardDetails, amount);
+        break;
 
-        case 'cash':
-        default:
-          result = await processCashPayment(amount);
-          break;
-      }
-
-      // Update order payment status
-      await updatePaymentStatus(orderId, {
-        status: result.pending ? 'pending' : 'completed',
-        transaction_id: result. transaction_id,
-      });
-
-      // Clear cart
-      clearCart();
-
-      // Navigate to result page
-      navigate('/payment/result', {
-        state: {
-          success: true,
-          orderId,
-          transactionId: result. transaction_id,
-          amount,
-          method: paymentMethod,
-          message: result.message,
-        },
-      });
-    } catch (error) {
-      console.error('Payment error:', error);
-      navigate('/payment/result', {
-        state: {
-          success: false,
-          orderId,
-          amount,
-          method:  paymentMethod,
-          message: error.message || 'Payment failed. Please try again.',
-        },
-      });
-    } finally {
-      setLoading(false);
+      case 'cash':
+      default:
+        result = await processCashPayment(amount);
+        break;
     }
-  };
+
+    // Update order payment status
+    await updatePaymentStatus(orderId, {
+      status: result.pending ? 'pending' : 'completed',
+      transaction_id: result.transaction_id,
+    });
+
+    // ✅ ADD THIS:  Complete the order (mark products as sold + update seller stats)
+    if (! result.pending) {
+      await completeOrder(orderId);
+    }
+
+    // Clear cart
+    clearCart();
+
+    // Navigate to result page
+    navigate('/payment/result', {
+      state: {
+        success: true,
+        orderId,
+        transactionId: result. transaction_id,
+        amount,
+        method: paymentMethod,
+        message: result.message,
+      },
+    });
+  } catch (error) {
+    console.error('Payment error:', error);
+    navigate('/payment/result', {
+      state: {
+        success: false,
+        orderId,
+        amount,
+        method:  paymentMethod,
+        message: error. message || 'Payment failed.  Please try again.',
+      },
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (! orderId) {
     return null;
