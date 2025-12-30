@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getSellerProducts, deleteProduct } from '../../services/productService';
 import { getSellerOrders } from '../../services/orderService';
+import { getUserSkills } from '../../services/skillService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatPrice, formatDate } from '../../utils/formatters';
 import { ORDER_STATUSES } from '../../utils/constants';
@@ -11,9 +12,10 @@ import toast from 'react-hot-toast';
 const SellerDashboard = () => {
   const { currentUser, userProfile } = useAuth();
   const [products, setProducts] = useState([]);
+  const [skills, setSkills] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('products');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     fetchData();
@@ -21,12 +23,14 @@ const SellerDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [productsData, ordersData] = await Promise.all([
-        getSellerProducts(currentUser.uid),
+      const [productsData, ordersData, skillsData] = await Promise.all([
+        getSellerProducts(currentUser. uid),
         getSellerOrders(currentUser.uid),
+        getUserSkills(currentUser.uid).catch(() => []),
       ]);
       setProducts(productsData);
       setOrders(ordersData);
+      setSkills(skillsData);
     } catch (error) {
       console. error('Error fetching seller data:', error);
       toast.error('Error loading dashboard');
@@ -50,11 +54,14 @@ const SellerDashboard = () => {
 
   const stats = {
     totalProducts: products.length,
-    activeProducts: products.filter(p => p. availability?. is_available).length,
+    activeProducts: products.filter(p => p.availability?. is_available).length,
     soldProducts: products.filter(p => ! p.availability?.is_available).length,
-    totalOrders: orders.length,
+    totalSkills: skills.length,
+    totalOrders: orders. length,
     pendingOrders: orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length,
+    completedOrders:  orders.filter(o => o.status === 'completed').length,
     totalSales: userProfile?.seller_stats?.total_sales || 0,
+    itemsSold: userProfile?.seller_stats?.products_sold || 0,
   };
 
   if (loading) {
@@ -64,72 +71,167 @@ const SellerDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm: px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Seller Dashboard</h1>
-          <Link to="/create-product" className="btn-primary">
-            + List New Product
-          </Link>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl p-8 mb-8 text-white">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Seller Dashboard</h1>
+              <p className="text-primary-100">Manage your products, skills, and track your sales</p>
+            </div>
+            <div className="flex gap-3 mt-4 md:mt-0">
+              <Link 
+                to="/create-product" 
+                className="bg-white text-primary-600 px-4 py-2 rounded-lg font-medium hover:bg-primary-50 transition-colors"
+              >
+                + List Product
+              </Link>
+              <Link 
+                to="/post-skill" 
+                className="bg-primary-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-400 transition-colors border border-primary-400"
+              >
+                + Post Skill
+              </Link>
+            </div>
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Total Products</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Active</p>
-            <p className="text-2xl font-bold text-green-600">{stats.activeProducts}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Sold</p>
-            <p className="text-2xl font-bold text-blue-600">{stats. soldProducts}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Total Orders</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Pending</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.pendingOrders}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Total Sales</p>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-primary-500">
+            <p className="text-sm text-gray-500 mb-1">Total Sales</p>
             <p className="text-2xl font-bold text-primary-600">{formatPrice(stats.totalSales)}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-green-500">
+            <p className="text-sm text-gray-500 mb-1">Items Sold</p>
+            <p className="text-2xl font-bold text-green-600">{stats.itemsSold}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-blue-500">
+            <p className="text-sm text-gray-500 mb-1">Active Listings</p>
+            <p className="text-2xl font-bold text-blue-600">{stats. activeProducts}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-yellow-500">
+            <p className="text-sm text-gray-500 mb-1">Pending Orders</p>
+            <p className="text-2xl font-bold text-yellow-600">{stats. pendingOrders}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-purple-500">
+            <p className="text-sm text-gray-500 mb-1">Skills Posted</p>
+            <p className="text-2xl font-bold text-purple-600">{stats. totalSkills}</p>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="border-b border-gray-200">
-            <nav className="flex">
-              <button
-                onClick={() => setActiveTab('products')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'products'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                My Products ({products.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('orders')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'orders'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover: text-gray-700'
-                }`}
-              >
-                Orders ({orders.length})
-              </button>
+            <nav className="flex overflow-x-auto">
+              {[
+                { id:  'overview', label: 'Overview', icon: '📊' },
+                { id: 'products', label: 'My Products', icon: '📦', count: products.length },
+                { id:  'orders', label: 'Orders Received', icon: '📋', count: orders.length },
+                { id: 'skills', label: 'My Skills', icon: '🎯', count:  skills.length },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap flex items-center gap-2 ${
+                    activeTab === tab.id
+                      ? 'border-primary-500 text-primary-600 bg-primary-50'
+                      :  'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>{tab.icon}</span>
+                  {tab.label}
+                  {tab.count !== undefined && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${
+                      activeTab === tab.id ? 'bg-primary-200 text-primary-700' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              ))}
             </nav>
           </div>
 
           <div className="p-6">
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Recent Orders */}
+                <div className="bg-gray-50 rounded-lg p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900">Recent Orders</h3>
+                    <button 
+                      onClick={() => setActiveTab('orders')}
+                      className="text-sm text-primary-600 hover: text-primary-700"
+                    >
+                      View All →
+                    </button>
+                  </div>
+                  {orders.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No orders yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {orders.slice(0, 3).map(order => {
+                        const status = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
+                        return (
+                          <div key={order.id} className="bg-white p-3 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">#{order.id. slice(-6)}</span>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                order. status === 'completed' ? 'bg-green-100 text-green-700' :
+                                order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                                {status.name}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">{formatPrice(order.order_summary?.total_amount)}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Products */}
+                <div className="bg-gray-50 rounded-lg p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900">Active Products</h3>
+                    <button 
+                      onClick={() => setActiveTab('products')}
+                      className="text-sm text-primary-600 hover:text-primary-700"
+                    >
+                      View All →
+                    </button>
+                  </div>
+                  {products. filter(p => p. availability?.is_available).length === 0 ? (
+                    <p className="text-gray-500 text-sm">No active products</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {products.filter(p => p. availability?.is_available).slice(0, 3).map(product => (
+                        <div key={product.id} className="bg-white p-3 rounded-lg flex items-center gap-3">
+                          <img
+                            src={product.images?.[0]?.url || 'https://via.placeholder.com/40'}
+                            alt={product.title}
+                            className="w-10 h-10 rounded object-cover"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{product. title}</p>
+                            <p className="text-xs text-gray-500">{formatPrice(product.price)}</p>
+                          </div>
+                          <span className="text-xs text-gray-400">Qty: {product.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Products Tab */}
             {activeTab === 'products' && (
               <div>
-                {products.length === 0 ?  (
+                {products.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-5xl mb-4">📦</div>
                     <h3 className="text-lg font-medium text-gray-900">No products yet</h3>
@@ -141,7 +243,7 @@ const SellerDashboard = () => {
                 ) : (
                   <div className="space-y-4">
                     {products.map(product => (
-                      <div key={product. id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                         <div className="flex items-center space-x-4">
                           <img
                             src={product.images?.[0]?.url || 'https://via.placeholder.com/60'}
@@ -151,34 +253,29 @@ const SellerDashboard = () => {
                           <div>
                             <h4 className="font-medium text-gray-900">{product. title}</h4>
                             <p className="text-sm text-gray-500">
-                              {formatPrice(product.price)} • Qty: {product.quantity}
+                              {formatPrice(product.price)} • Qty: {product. quantity}
                             </p>
-                            <span className={`text-xs ${product.availability?.is_available ? 'text-green-600' : 'text-red-600'}`}>
-                              {product.availability?. is_available ? '● Active' : '● Sold'}
+                            <span className={`inline-flex items-center text-xs mt-1 ${product.availability?.is_available ? 'text-green-600' : 'text-red-600'}`}>
+                              <span className={`w-2 h-2 rounded-full mr-1 ${product.availability?. is_available ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                              {product.availability?.is_available ? 'Active' : 'Sold Out'}
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Link
-                            to={`/product/${product.id}`}
-                            className="p-2 text-gray-500 hover:text-primary-600"
+                            to={`/product/${product. id}`}
+                            className="p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
+                            title="View"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </Link>
-                          <Link
-                            to={`/edit-product/${product. id}`}
-                            className="p-2 text-gray-500 hover: text-blue-600"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </Link>
                           <button
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="p-2 text-gray-500 hover: text-red-600"
+                            onClick={() => handleDeleteProduct(product. id)}
+                            className="p-2 text-gray-500 hover: text-red-600 hover:bg-white rounded-lg transition-colors"
+                            title="Delete"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-. 867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -192,44 +289,97 @@ const SellerDashboard = () => {
               </div>
             )}
 
+            {/* Orders Tab */}
             {activeTab === 'orders' && (
               <div>
-                {orders.length === 0 ?  (
+                {orders.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-5xl mb-4">📋</div>
-                    <h3 className="text-lg font-medium text-gray-900">No orders yet</h3>
-                    <p className="text-gray-500 mt-1">Orders will appear here when someone buys your products.</p>
+                    <h3 className="text-lg font-medium text-gray-900">No orders received yet</h3>
+                    <p className="text-gray-500 mt-1">Orders from buyers will appear here.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {orders.map(order => {
-                      const status = ORDER_STATUSES[order.status] || ORDER_STATUSES. pending;
+                      const status = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
                       return (
-                        <div key={order.id} className="p-4 bg-gray-50 rounded-lg">
+                        <div key={order.id} className="p-5 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                           <div className="flex items-center justify-between mb-3">
                             <div>
-                              <p className="text-sm text-gray-500">Order #{order. id. slice(-8)}</p>
-                              <p className="text-xs text-gray-400">{formatDate(order.created_at)}</p>
+                              <p className="font-medium text-gray-900">Order #{order.id. slice(-8)}</p>
+                              <p className="text-sm text-gray-500">{formatDate(order.created_at)}</p>
                             </div>
-                            <span className={`badge badge-${status. color}`}>
-                              {status.icon} {status.name}
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                              order.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                              order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {status. icon} {status.name}
                             </span>
                           </div>
-                          <div className="space-y-2">
+                          <div className="space-y-2 mb-3">
                             {order.products.map((product, idx) => (
-                              <div key={idx} className="flex justify-between text-sm">
+                              <div key={idx} className="flex justify-between text-sm bg-white p-2 rounded">
                                 <span>{product.product_name} × {product.quantity}</span>
-                                <span className="font-medium">{formatPrice(product. total)}</span>
+                                <span className="font-medium">{formatPrice(product.total)}</span>
                               </div>
                             ))}
                           </div>
-                          <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between">
-                            <span className="text-sm text-gray-500">Buyer:  {order.buyer_name}</span>
-                            <span className="font-bold">{formatPrice(order.order_summary.total_amount)}</span>
+                          <div className="pt-3 border-t border-gray-200 flex flex-wrap justify-between gap-2">
+                            <div className="text-sm">
+                              <span className="text-gray-500">Buyer:  </span>
+                              <span className="font-medium">{order.buyer_name}</span>
+                            </div>
+                            <div className="text-lg font-bold text-primary-600">
+                              {formatPrice(order.order_summary?.total_amount)}
+                            </div>
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Skills Tab */}
+            {activeTab === 'skills' && (
+              <div>
+                {skills.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-5xl mb-4">🎯</div>
+                    <h3 className="text-lg font-medium text-gray-900">No skills posted yet</h3>
+                    <p className="text-gray-500 mt-1">Share your skills and find people to barter with. </p>
+                    <Link to="/post-skill" className="btn-primary mt-4 inline-block">
+                      Post a Skill
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {skills.map(skill => (
+                      <div key={skill.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-medium text-gray-900">{skill.title}</h4>
+                            <p className="text-sm text-gray-500 mt-1">{skill.category}</p>
+                            <span className={`inline-block mt-2 text-xs px-2 py-1 rounded-full ${
+                              skill.level === 'beginner' ? 'bg-green-100 text-green-700' :
+                              skill.level === 'intermediate' ? 'bg-blue-100 text-blue-700' : 
+                              'bg-purple-100 text-purple-700'
+                            }`}>
+                              {skill.level}
+                            </span>
+                          </div>
+                          <Link
+                            to={`/skill/${skill.id}`}
+                            className="text-primary-600 hover: text-primary-700 text-sm"
+                          >
+                            View →
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

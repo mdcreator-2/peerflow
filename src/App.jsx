@@ -38,6 +38,9 @@ import Checkout from './components/Cart/Checkout';
 import PaymentPage from './components/Payment/PaymentPage';
 import PaymentResult from './components/Payment/PaymentResult';
 
+// Order Components
+import MyOrders from './components/Orders/MyOrders';
+
 // Profile Components
 import EditProfile from './components/Profile/EditProfile';
 import UserProfile from './components/Profile/UserProfile';
@@ -53,7 +56,7 @@ function App() {
               position="top-right"
               toastOptions={{
                 duration: 3000,
-                style: {
+                style:  {
                   background: '#333',
                   color: '#fff',
                 },
@@ -95,6 +98,18 @@ function App() {
                 <Route path="/user/: id" element={<UserProfile />} />
 
                 {/* Protected Routes - Require Authentication */}
+                
+                {/* Seller Dashboard - Single unified page */}
+                <Route
+                  path="/seller-dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <SellerDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Create Product */}
                 <Route
                   path="/create-product"
                   element={
@@ -103,14 +118,8 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/my-products"
-                  element={
-                    <ProtectedRoute>
-                      <SellerDashboard />
-                    </ProtectedRoute>
-                  }
-                />
+                
+                {/* Post Skill */}
                 <Route
                   path="/post-skill"
                   element={
@@ -119,19 +128,23 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/my-skills"
-                  element={
-                    <ProtectedRoute>
-                      <SellerDashboard />
-                    </ProtectedRoute>
-                  }
-                />
+                
+                {/* Barter Requests */}
                 <Route
                   path="/barter-requests"
                   element={
                     <ProtectedRoute>
                       <BarterRequests />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Buyer's Orders */}
+                <Route
+                  path="/my-orders"
+                  element={
+                    <ProtectedRoute>
+                      <MyOrders />
                     </ProtectedRoute>
                   }
                 />
@@ -180,11 +193,29 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+
+                {/* Legacy routes - redirect to new paths */}
+                <Route
+                  path="/my-products"
+                  element={
+                    <ProtectedRoute>
+                      <SellerDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/my-skills"
+                  element={
+                    <ProtectedRoute>
+                      <SellerDashboard />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/orders"
                   element={
                     <ProtectedRoute>
-                      <SellerDashboard />
+                      <MyOrders />
                     </ProtectedRoute>
                   }
                 />

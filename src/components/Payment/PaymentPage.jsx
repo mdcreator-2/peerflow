@@ -5,6 +5,7 @@ import { updatePaymentStatus } from '../../services/orderService';
 import { processPayment, processUPIPayment, processCardPayment, processCashPayment } from '../../services/paymentService';
 import { formatPrice } from '../../utils/formatters';
 import toast from 'react-hot-toast';
+import { completeOrder } from '../../services/orderService';
 
 const PaymentPage = () => {
   const location = useLocation();
@@ -97,7 +98,7 @@ const handlePayment = async () => {
         orderId,
         amount,
         method:  paymentMethod,
-        message: error. message || 'Payment failed.  Please try again.',
+        message: error.message || 'Payment failed.  Please try again.',
       },
     });
   } finally {

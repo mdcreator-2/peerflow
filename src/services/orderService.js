@@ -19,13 +19,11 @@ const ORDERS_COLLECTION = 'orders';
 // Create a new order
 export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, paymentInfo) => {
   try {
-    // Calculate order totals
     const subtotal = cartItems. reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const deliveryFee = deliveryInfo.method === 'delivery' ? 
       cartItems.reduce((sum, item) => sum + (item.delivery_fee || 0), 0) : 0;
     const totalAmount = subtotal + deliveryFee;
 
-    // Create products array for order
     const products = cartItems.map(item => ({
       product_id: item. id,
       product_name: item. title,
@@ -36,13 +34,12 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
       seller_name: item.seller_name,
     }));
 
-    // Get unique sellers
     const sellerIds = [... new Set(cartItems.map(item => item.seller_id))];
 
     const orderRef = await addDoc(collection(db, ORDERS_COLLECTION), {
-      buyer_id: buyerId,
-      buyer_name: buyerInfo.displayName,
-      buyer_email: buyerInfo. email,
+      buyer_id:  buyerId,
+      buyer_name: buyerInfo. displayName,
+      buyer_email: buyerInfo.email,
       seller_ids: sellerIds,
       products,
       order_summary: {
@@ -60,7 +57,7 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
       },
       delivery:  {
         method:  deliveryInfo.method,
-        pickup_location: deliveryInfo.method === 'pickup' ? deliveryInfo. pickup_location : '',
+        pickup_location: deliveryInfo.method === 'pickup' ? deliveryInfo.pickup_location : '',
         delivery_address: deliveryInfo. method === 'delivery' ? deliveryInfo.address : '',
         hostel:  deliveryInfo.hostel || '',
         room:  deliveryInfo.room || '',
@@ -88,7 +85,7 @@ export const getOrderById = async (orderId) => {
     const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId));
     
     if (orderDoc.exists()) {
-      return { id: orderDoc. id, ...orderDoc.data() };
+      return { id: orderDoc.id, ...orderDoc. data() };
     }
     
     return null;
@@ -98,9 +95,10 @@ export const getOrderById = async (orderId) => {
   }
 };
 
-// Get user's orders (as buyer)
+// Get user's orders (as buyer) - with fallback
 export const getUserOrders = async (userId) => {
   try {
+    // Try with orderBy first
     const q = query(
       collection(db, ORDERS_COLLECTION),
       where('buyer_id', '==', userId),
@@ -108,19 +106,43 @@ export const getUserOrders = async (userId) => {
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id:  doc.id,
+    return snapshot.docs. map(doc => ({
+      id: doc.id,
       ...doc.data(),
     }));
   } catch (error) {
-    console.error('Get user orders error:', error);
-    throw error;
+    console.error('Get user orders error (trying fallback):', error);
+    
+    // Fallback:  query without orderBy, sort manually
+    try {
+      const q = query(
+        collection(db, ORDERS_COLLECTION),
+        where('buyer_id', '==', userId)
+      );
+      
+      const snapshot = await getDocs(q);
+      const orders = snapshot.docs.map(doc => ({
+        id:  doc.id,
+        ...doc.data(),
+      }));
+      
+      // Sort manually by created_at (descending)
+      return orders.sort((a, b) => {
+        const aTime = a.created_at?. toMillis?. () || 0;
+        const bTime = b.created_at?.toMillis?.() || 0;
+        return bTime - aTime;
+      });
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError);
+      return [];
+    }
   }
 };
 
-// Get seller's orders
+// Get seller's orders - with fallback for index issues
 export const getSellerOrders = async (sellerId) => {
   try {
+    // Try with orderBy first
     const q = query(
       collection(db, ORDERS_COLLECTION),
       where('seller_ids', 'array-contains', sellerId),
@@ -133,8 +155,31 @@ export const getSellerOrders = async (sellerId) => {
       ... doc.data(),
     }));
   } catch (error) {
-    console. error('Get seller orders error:', error);
-    throw error;
+    console. error('Get seller orders error (trying fallback):', error);
+    
+    // Fallback: query without orderBy, then sort manually
+    try {
+      const q = query(
+        collection(db, ORDERS_COLLECTION),
+        where('seller_ids', 'array-contains', sellerId)
+      );
+      
+      const snapshot = await getDocs(q);
+      const orders = snapshot.docs.map(doc => ({
+        id:  doc.id,
+        ...doc.data(),
+      }));
+      
+      // Sort manually by created_at (descending)
+      return orders. sort((a, b) => {
+        const aTime = a.created_at?. toMillis?.() || 0;
+        const bTime = b.created_at?.toMillis?. () || 0;
+        return bTime - aTime;
+      });
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError);
+      return [];
+    }
   }
 };
 
@@ -143,7 +188,7 @@ export const updateOrderStatus = async (orderId, status) => {
   try {
     const updates = {
       status,
-      updated_at:  serverTimestamp(),
+      updated_at: serverTimestamp(),
     };
 
     if (status === 'completed') {
@@ -163,8 +208,8 @@ export const updatePaymentStatus = async (orderId, paymentData) => {
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
       'payment.status': paymentData.status,
       'payment. transaction_id': paymentData.transaction_id || null,
-      'payment.payment_date': paymentData. status === 'completed' ? serverTimestamp() : null,
-      status: paymentData.status === 'completed' ?  'confirmed' : 'pending',
+      'payment.payment_date': paymentData.status === 'completed' ? serverTimestamp() : null,
+      status: paymentData. status === 'completed' ?  'confirmed' : 'pending',
       updated_at: serverTimestamp(),
     });
   } catch (error) {
@@ -178,27 +223,45 @@ export const completeOrder = async (orderId) => {
   try {
     const order = await getOrderById(orderId);
     
-    if (!order) throw new Error('Order not found');
+    if (! order) throw new Error('Order not found');
 
-    // Mark all products as sold
+    console.log('🔄 Completing order:', orderId);
+    console.log('📦 Products in order:', order.products);
+
+    // Update product quantities and seller stats for each product
     for (const product of order.products) {
-      await updateProductQuantity(product.product_id, product.quantity);
+      console.log(`🔄 Updating product:  ${product.product_id}, quantity: ${product.quantity}`);
+      
+      // Decrement product quantity
+      try {
+        const result = await updateProductQuantity(product.product_id, product.quantity);
+        console.log(`✅ Product ${product.product_id} updated: `, result);
+      } catch (productError) {
+        console.error(`❌ Failed to update product ${product.product_id}:`, productError);
+      }
       
       // Update seller stats
-      await updateDoc(doc(db, 'users', product.seller_id), {
-        'seller_stats.products_sold': increment(1),
-        'seller_stats.total_sales': increment(product.total),
-      });
+      try {
+        await updateDoc(doc(db, 'users', product.seller_id), {
+          'seller_stats.products_sold': increment(product.quantity),
+          'seller_stats. total_sales': increment(product. total),
+        });
+        console.log(`✅ Seller ${product.seller_id} stats updated`);
+      } catch (sellerError) {
+        console. error(`❌ Failed to update seller ${product.seller_id} stats:`, sellerError);
+      }
     }
 
-    // Update order status
+    // Update order status to completed
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
       status: 'completed',
       'delivery.status': 'delivered',
-      'delivery.delivered_at': serverTimestamp(),
+      'delivery.delivered_at':  serverTimestamp(),
       completed_at: serverTimestamp(),
       updated_at: serverTimestamp(),
     });
+    
+    console.log(`✅ Order ${orderId} completed successfully`);
   } catch (error) {
     console. error('Complete order error:', error);
     throw error;
@@ -213,7 +276,7 @@ export const cancelOrder = async (orderId) => {
       updated_at: serverTimestamp(),
     });
   } catch (error) {
-    console.error('Cancel order error:', error);
+    console. error('Cancel order error:', error);
     throw error;
   }
 };

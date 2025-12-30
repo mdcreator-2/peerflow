@@ -24,7 +24,7 @@ const Navbar = () => {
 
   const navLinks = [
     { path: '/marketplace', label: 'Marketplace', icon:  '🛍️' },
-    { path: '/skills', label: 'Skill Barter', icon: '🤝' },
+    { path:  '/skills', label: 'Skill Barter', icon: '🤝' },
   ];
 
   return (
@@ -35,7 +35,7 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
               <span className="text-2xl">🔄</span>
-              <span className="text-xl font-bold text-primary-600">CircleShare</span>
+              <span className="text-xl font-bold text-primary-600">PeerFlow</span>
             </Link>
           </div>
 
@@ -48,11 +48,11 @@ const Navbar = () => {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive(link.path)
                     ? 'bg-primary-50 text-primary-700'
-                    :  'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
                 <span className="mr-1">{link.icon}</span>
-                {link. label}
+                {link.label}
               </Link>
             ))}
           </div>
@@ -67,7 +67,7 @@ const Navbar = () => {
                   className="relative p-2 text-gray-600 hover:text-primary-600 transition-colors"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-. 184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   {getCartCount() > 0 && (
                     <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
@@ -82,7 +82,7 @@ const Navbar = () => {
                     onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                     className="flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    {userProfile?. photoURL ? (
+                    {userProfile?.photoURL ? (
                       <img
                         src={userProfile.photoURL}
                         alt={userProfile.displayName}
@@ -90,7 +90,7 @@ const Navbar = () => {
                       />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-medium">
-                        {userProfile?.displayName?.charAt(0) || currentUser?.email?. charAt(0) || '? '}
+                        {userProfile?.displayName?. charAt(0) || currentUser?.email?. charAt(0) || '? '}
                       </div>
                     )}
                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,6 +100,7 @@ const Navbar = () => {
 
                   {profileDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                      {/* User Info */}
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {userProfile?.displayName || 'User'}
@@ -108,6 +109,8 @@ const Navbar = () => {
                           {currentUser?.email}
                         </p>
                       </div>
+                      
+                      {/* Profile Link */}
                       <Link
                         to="/profile"
                         onClick={() => setProfileDropdownOpen(false)}
@@ -115,35 +118,39 @@ const Navbar = () => {
                       >
                         👤 My Profile
                       </Link>
+                      
+                      {/* My Orders (Buyer) */}
                       <Link
-                        to="/my-products"
+                        to="/my-orders"
                         onClick={() => setProfileDropdownOpen(false)}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        📦 My Products
+                        📦 My Orders
                       </Link>
-                      <Link
-                        to="/my-skills"
-                        onClick={() => setProfileDropdownOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover: bg-gray-50"
-                      >
-                        🎯 My Skills
-                      </Link>
-                      <Link
-                        to="/orders"
-                        onClick={() => setProfileDropdownOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover: bg-gray-50"
-                      >
-                        📋 My Orders
-                      </Link>
+                      
+                      {/* Barter Requests */}
                       <Link
                         to="/barter-requests"
                         onClick={() => setProfileDropdownOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover: bg-gray-50"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
                         🔄 Barter Requests
                       </Link>
+                      
                       <hr className="my-1" />
+                      
+                      {/* Seller Dashboard */}
+                      <Link
+                        to="/seller-dashboard"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 font-medium"
+                      >
+                        🏪 Seller Dashboard
+                      </Link>
+                      
+                      <hr className="my-1" />
+                      
+                      {/* Logout */}
                       <button
                         onClick={() => {
                           setProfileDropdownOpen(false);
@@ -161,7 +168,7 @@ const Navbar = () => {
               <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
-                  className="text-gray-600 hover: text-gray-900 font-medium text-sm"
+                  className="text-gray-600 hover:text-gray-900 font-medium text-sm"
                 >
                   Login
                 </Link>
@@ -208,6 +215,25 @@ const Navbar = () => {
                 {link.label}
               </Link>
             ))}
+            {isAuthenticated && (
+              <>
+                <hr className="my-2" />
+                <Link
+                  to="/my-orders"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  📦 My Orders
+                </Link>
+                <Link
+                  to="/seller-dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  🏪 Seller Dashboard
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>
