@@ -80,7 +80,7 @@ const Checkout = () => {
   };
 
   const subtotal = getCartTotal();
-  const deliveryFee = formData. deliveryMethod === 'delivery'
+  const deliveryFee = formData.deliveryMethod === 'delivery'
     ? cartItems.reduce((sum, item) => sum + (item.delivery_fee || 0), 0)
     : 0;
   const total = subtotal + deliveryFee;
@@ -152,11 +152,13 @@ const Checkout = () => {
                 )}
               </div>
 
+
+                <div className="bg-white rounded-xl shadow-md p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-4">Additional Details</h2>
+                  <div className="space-y-4">
               {/* Delivery Address - Show only if delivery is selected */}
               {formData.deliveryMethod === 'delivery' && (
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery Address</h2>
-                  <div className="space-y-4">
+                <>
                     <div>
                       <label htmlFor="hostel" className="block text-sm font-medium text-gray-700">
                         Hostel <span className="text-red-500">*</span>
@@ -194,7 +196,8 @@ const Checkout = () => {
                         placeholder="e. g., A-101"
                       />
                     </div>
-
+                      </>
+                    )}
                     <div>
                       <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
                         Phone Number <span className="text-red-500">*</span>
@@ -215,7 +218,7 @@ const Checkout = () => {
                     </div>
                   </div>
                 </div>
-              )}
+              
 
               {/* Payment Method */}
               <div className="bg-white rounded-xl shadow-md p-6">

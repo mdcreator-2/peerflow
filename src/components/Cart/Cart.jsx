@@ -36,8 +36,8 @@ const Cart = () => {
   }
 
   const subtotal = getCartTotal();
-  const deliveryFee = cartItems.reduce((sum, item) => sum + (item.delivery_fee || 0), 0);
-  const total = subtotal + deliveryFee;
+  /*const deliveryFee = cartItems.reduce((sum, item) => sum + (item.delivery_fee || 0), 0);*/
+  const total = subtotal;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -75,7 +75,7 @@ const Cart = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Delivery Fee</span>
-                  <span className="font-medium">{deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}</span>
+                  <span className="font-medium">to be calculated at checkout</span>
                 </div>
                 <hr />
                 <div className="flex justify-between text-lg">
