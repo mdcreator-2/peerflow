@@ -1,5 +1,5 @@
 // App Constants
-export const APP_NAME = 'CircleShare';
+export const APP_NAME = 'PeerFlow';
 export const CAMPUS_DOMAIN = 'nitp.ac.in';
 
 // Product Categories

@@ -12,7 +12,7 @@ const Footer = () => {
           <div className="col-span-1 md:col-span-2">
             <Link to="/" className="flex items-center space-x-2 mb-4">
               <span className="text-2xl">🔄</span>
-              <span className="text-xl font-bold text-white">CircleShare</span>
+              <span className="text-xl font-bold text-white">PeerFlow</span>
             </Link>
             <p className="text-gray-400 text-sm max-w-md">
               A peer-to-peer campus marketplace connecting NIT Patna students 
@@ -92,7 +92,7 @@ const Footer = () => {
 
         <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-400 text-sm">
-            © {currentYear} CircleShare. Made with ❤️ at NIT Patna.
+            © {currentYear} PeerFlow. Made with ❤️ at NIT Patna.
           </p>
           <p className="text-gray-500 text-xs mt-2 md:mt-0">
             Smart India Hackathon 2025

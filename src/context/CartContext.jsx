@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect } from 'react';
 
 export const CartContext = createContext(null);
 
-const CART_STORAGE_KEY = 'circleshare_cart';
+const CART_STORAGE_KEY = 'peerflow_cart';
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);

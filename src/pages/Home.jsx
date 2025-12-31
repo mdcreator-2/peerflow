@@ -200,7 +200,7 @@ const Home = () => {
             Ready to Get Started?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Join hundreds of NIT Patna students already using CircleShare
+            Join hundreds of NIT Patna students already using PeerFlow to buy, sell, and share skills.
           </p>
           {isAuthenticated ? (
             <div className="flex flex-col sm:flex-row justify-center gap-4">
