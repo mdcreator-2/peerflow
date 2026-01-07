@@ -1,8 +1,7 @@
-// Format price in Indian Rupees
 export const formatPrice = (price) => {
   if (price === null || price === undefined) return '₹0';
   
-  return new Intl. NumberFormat('en-IN', {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 0,
@@ -10,7 +9,6 @@ export const formatPrice = (price) => {
   }).format(price);
 };
 
-// Format price with decimals
 export const formatPriceWithDecimals = (price) => {
   if (price === null || price === undefined) return '₹0.00';
   
@@ -18,39 +16,36 @@ export const formatPriceWithDecimals = (price) => {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 2,
-    maximumFractionDigits:  2,
+    maximumFractionDigits: 2,
   }).format(price);
 };
 
-// Format date
 export const formatDate = (date) => {
-  if (! date) return '';
-  
-  const d = date.toDate ?  date.toDate() : new Date(date);
-  
-  return new Intl.DateTimeFormat('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year:  'numeric',
-  }).format(d);
-};
-
-// Format date with time
-export const formatDateTime = (date) => {
-  if (! date) return '';
+  if (!date) return '';
   
   const d = date.toDate ? date.toDate() : new Date(date);
   
   return new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
     month: 'short',
-    year:  'numeric',
+    year: 'numeric',
+  }).format(d);
+};
+
+export const formatDateTime = (date) => {
+  if (!date) return '';
+  
+  const d = date.toDate ? date.toDate() : new Date(date);
+  
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(d);
 };
 
-// Format relative time (e.g., "2 hours ago")
 export const formatRelativeTime = (date) => {
   if (!date) return '';
   
@@ -66,9 +61,8 @@ export const formatRelativeTime = (date) => {
   return formatDate(d);
 };
 
-// Format phone number
 export const formatPhone = (phone) => {
-  if (! phone) return '';
+  if (!phone) return '';
   
   const cleaned = phone.replace(/\D/g, '');
   
@@ -79,7 +73,6 @@ export const formatPhone = (phone) => {
   return phone;
 };
 
-// Truncate text
 export const truncateText = (text, maxLength = 100) => {
   if (!text) return '';
   if (text.length <= maxLength) return text;
@@ -87,25 +80,21 @@ export const truncateText = (text, maxLength = 100) => {
   return text.substring(0, maxLength).trim() + '...';
 };
 
-// Capitalize first letter
 export const capitalize = (text) => {
   if (!text) return '';
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 };
 
-// Capitalize each word
 export const capitalizeWords = (text) => {
   if (!text) return '';
   return text.split(' ').map(word => capitalize(word)).join(' ');
 };
 
-// Format number with commas
 export const formatNumber = (num) => {
   if (num === null || num === undefined) return '0';
-  return new Intl. NumberFormat('en-IN').format(num);
+  return new Intl.NumberFormat('en-IN').format(num);
 };
 
-// Format file size
 export const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 Bytes';
   
@@ -116,26 +105,23 @@ export const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Get initials from name
 export const getInitials = (name) => {
-  if (!name) return '? ';
+  if (!name) return '?';
   
-  const parts = name. trim().split(' ');
+  const parts = name.trim().split(' ');
   
-  if (parts. length === 1) {
+  if (parts.length === 1) {
     return parts[0].charAt(0).toUpperCase();
   }
   
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-// Format rating display
 export const formatRating = (rating) => {
-  if (! rating) return '0. 0';
+  if (!rating) return '0.0';
   return parseFloat(rating).toFixed(1);
 };
 
-// Slugify text (for URLs)
 export const slugify = (text) => {
   if (!text) return '';
   
@@ -147,7 +133,6 @@ export const slugify = (text) => {
     .replace(/^-+|-+$/g, '');
 };
 
-// Generate random color for avatars
 export const getAvatarColor = (name) => {
   if (!name) return '#14b8a6';
   

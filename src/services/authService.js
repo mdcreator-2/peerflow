@@ -11,33 +11,24 @@ import {
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase.config';
 
-const CAMPUS_DOMAIN = import.meta.env. VITE_CAMPUS_DOMAIN || 'nitp. ac.in';
+const CAMPUS_DOMAIN = import.meta.env.VITE_CAMPUS_DOMAIN || 'nitp.ac.in';
 
-// Validate campus email
 export const isCampusEmail = (email) => {
-  return email. endsWith(`@${CAMPUS_DOMAIN}`);
+  return email.endsWith(`@${CAMPUS_DOMAIN}`);
 };
 
-// Sign up with email and password
 export const signup = async (email, password, displayName) => {
   try {
-    // Create auth user
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // Update display name
     await updateProfile(user, { displayName });
-
-    // Send email verification
     await sendEmailVerification(user);
 
-    // Check if campus email
     const campusVerified = isCampusEmail(email);
-
-    // Create user document in Firestore
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
-      email:  email,
+      email: email,
       displayName: displayName,
       photoURL: '',
       bio: '',
@@ -59,7 +50,7 @@ export const signup = async (email, password, displayName) => {
       skills: [],
       seller_stats: {
         products_listed: 0,
-        products_sold:  0,
+        products_sold: 0,
         total_sales: 0,
         response_time_hours: 24,
       },
@@ -76,7 +67,6 @@ export const signup = async (email, password, displayName) => {
   }
 };
 
-// Sign in with email and password
 export const signin = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -87,29 +77,24 @@ export const signin = async (email, password) => {
   }
 };
 
-// Sign in with Google
 export const signinWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({
-      hd:  CAMPUS_DOMAIN, // Restrict to campus domain
-    });
+    provider.setCustomParameters({ hd: CAMPUS_DOMAIN });
 
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
 
-    // Check if user document exists
     const userDoc = await getDoc(doc(db, 'users', user.uid));
 
-    if (! userDoc.exists()) {
-      // Create new user document
+    if (!userDoc.exists()) {
       const campusVerified = isCampusEmail(user.email);
       
-      await setDoc(doc(db, 'users', user. uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
-        email:  user.email,
+        email: user.email,
         displayName: user.displayName || '',
-        photoURL:  user.photoURL || '',
+        photoURL: user.photoURL || '',
         bio: '',
         campusId: '',
         emailVerified: user.emailVerified,
@@ -117,7 +102,7 @@ export const signinWithGoogle = async () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         role: 'buyer',
-        location:  {
+        location: {
           hostel: '',
           room: '',
         },
@@ -127,10 +112,10 @@ export const signinWithGoogle = async () => {
           count: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
         },
         skills: [],
-        seller_stats:  {
+        seller_stats: {
           products_listed: 0,
           products_sold: 0,
-          total_sales:  0,
+          total_sales: 0,
           response_time_hours: 24,
         },
         preferences: {
@@ -147,12 +132,11 @@ export const signinWithGoogle = async () => {
   }
 };
 
-// Get user profile from Firestore
 export const getUserProfile = async (userId) => {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
     if (userDoc.exists()) {
-      return { id: userDoc.id, ...userDoc. data() };
+      return { id: userDoc.id, ...userDoc.data() };
     }
     return null;
   } catch (error) {
@@ -161,7 +145,6 @@ export const getUserProfile = async (userId) => {
   }
 };
 
-// Update user profile
 export const updateUserProfile = async (userId, updates) => {
   try {
     const userRef = doc(db, 'users', userId);
@@ -170,12 +153,11 @@ export const updateUserProfile = async (userId, updates) => {
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    console. error('Update profile error:', error);
+    console.error('Update profile error:', error);
     throw error;
   }
 };
 
-// Sign out
 export const logout = async () => {
   try {
     await signOut(auth);
@@ -185,7 +167,6 @@ export const logout = async () => {
   }
 };
 
-// Reset password
 export const resetPassword = async (email) => {
   try {
     await sendPasswordResetEmail(auth, email);
@@ -195,7 +176,6 @@ export const resetPassword = async (email) => {
   }
 };
 
-// Resend verification email
 export const resendVerificationEmail = async () => {
   try {
     if (auth.currentUser) {

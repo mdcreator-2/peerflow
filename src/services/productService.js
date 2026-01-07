@@ -8,36 +8,31 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
-  limit,
   serverTimestamp,
   increment,
 } from 'firebase/firestore';
 import { db } from './firebase.config';
 
 const PRODUCTS_COLLECTION = 'products';
-
-// Add this at the top of the file
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 
-// Upload image to ImgBB (free hosting)
 const uploadToImgBB = async (file) => {
   try {
     const formData = new FormData();
     formData.append('image', file);
 
     const response = await fetch(
-      `https://api.imgbb. com/1/upload?key=${IMGBB_API_KEY}`,
+      `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
       {
         method: 'POST',
         body: formData,
       }
     );
 
-    const data = await response. json();
+    const data = await response.json();
 
-    if (data. success) {
-      return data.data. url; // Returns direct image URL
+    if (data.success) {
+      return data.data.url;
     } else {
       throw new Error('ImgBB upload failed');
     }
@@ -47,7 +42,6 @@ const uploadToImgBB = async (file) => {
   }
 };
 
-// Convert to Base64 (fallback)
 const imageToBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -57,7 +51,6 @@ const imageToBase64 = (file) => {
   });
 };
 
-// Upload product images - tries ImgBB first, falls back to Base64
 export const uploadProductImages = async (files) => {
   const imageUrls = [];
 
@@ -65,22 +58,15 @@ export const uploadProductImages = async (files) => {
     try {
       let url = null;
 
-      // Try ImgBB first if API key exists
       if (IMGBB_API_KEY) {
         url = await uploadToImgBB(file);
-        if (url) {
-          console.log('✅ Image uploaded to ImgBB:', url);
-        }
       }
 
-      // Fallback to Base64 if ImgBB fails or no API key
       if (!url) {
         if (file.size > 1 * 1024 * 1024) {
-          console.warn('File too large for Base64, using placeholder');
           url = `https://via.placeholder.com/400x300?text=Image+Too+Large`;
         } else {
           url = await imageToBase64(file);
-          console.log('✅ Image converted to Base64');
         }
       }
 
@@ -100,7 +86,6 @@ export const uploadProductImages = async (files) => {
   return imageUrls;
 };
 
-// Create a new product
 export const createProduct = async (sellerId, sellerInfo, productData, imageFiles = []) => {
   try {
     let images = [];
@@ -115,23 +100,23 @@ export const createProduct = async (sellerId, sellerInfo, productData, imageFile
 
     const productRef = await addDoc(collection(db, PRODUCTS_COLLECTION), {
       seller_id: sellerId,
-      seller_name: sellerInfo?. displayName || 'Anonymous',
-      seller_avatar: sellerInfo?. photoURL || '',
+      seller_name: sellerInfo?.displayName || 'Anonymous',
+      seller_avatar: sellerInfo?.photoURL || '',
       seller_rating: sellerInfo?.ratings?.averageRating || 0,
       title: productData.title,
-      description:  productData.description,
+      description: productData.description,
       category: productData.category,
-      price:  parseFloat(productData. price),
+      price: parseFloat(productData.price),
       quantity: parseInt(productData.quantity),
       condition: productData.condition,
-      images:  images,
+      images: images,
       location: {
         hostel: productData.hostel || '',
-        pickup_available: productData.pickup_available ??  true,
-        delivery_available: productData. delivery_available ?? false,
+        pickup_available: productData.pickup_available ?? true,
+        delivery_available: productData.delivery_available ?? false,
       },
       availability: {
-        is_available: true,  // IMPORTANT: This must be true!
+        is_available: true,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
         sold_at: null,
@@ -139,7 +124,7 @@ export const createProduct = async (sellerId, sellerInfo, productData, imageFile
       delivery_options: {
         pickup_on_campus: productData.pickup_available ?? true,
         delivery_available: productData.delivery_available ?? false,
-        delivery_fee: parseFloat(productData. delivery_fee) || 0,
+        delivery_fee: parseFloat(productData.delivery_fee) || 0,
       },
       reviews_count: 0,
       average_rating: 0,
@@ -150,112 +135,72 @@ export const createProduct = async (sellerId, sellerInfo, productData, imageFile
       },
     });
 
-    return productRef. id;
+    return productRef.id;
   } catch (error) {
     console.error('Create product error:', error);
     throw error;
   }
 };
 
-// Get all available products - SIMPLIFIED QUERY (no complex ordering)
+const fetchProductsWithFallback = async (queryConstraints, filterFn = null) => {
+  try {
+    const q = query(collection(db, PRODUCTS_COLLECTION), ...queryConstraints);
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Query error, using fallback:', error);
+    const fallbackSnapshot = await getDocs(collection(db, PRODUCTS_COLLECTION));
+    const allProducts = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    return filterFn ? allProducts.filter(filterFn) : allProducts;
+  }
+};
+
 export const getProducts = async () => {
   try {
-    // Simple query without ordering to avoid index issues
-    const q = query(
-      collection(db, PRODUCTS_COLLECTION),
-      where('availability.is_available', '==', true)
+    const products = await fetchProductsWithFallback(
+      [where('availability.is_available', '==', true)],
+      p => p.availability?.is_available === true || p.availability?.is_available === undefined
     );
-
-    const snapshot = await getDocs(q);
-    const products = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ... doc.data(),
-    }));
-
-    console.log('Fetched products:', products.length); // Debug log
     return { products, hasMore: false };
   } catch (error) {
     console.error('Get products error:', error);
-    
-    // Fallback:  Get ALL products if the filtered query fails
-    try {
-      console.log('Trying fallback query...');
-      const fallbackSnapshot = await getDocs(collection(db, PRODUCTS_COLLECTION));
-      const allProducts = fallbackSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ... doc.data(),
-      }));
-      
-      // Filter manually
-      const availableProducts = allProducts.filter(p => 
-        p.availability?. is_available === true || p.availability?.is_available === undefined
-      );
-      
-      console.log('Fallback products:', availableProducts.length);
-      return { products:  availableProducts, hasMore: false };
-    } catch (fallbackError) {
-      console.error('Fallback query also failed:', fallbackError);
-      return { products: [], hasMore: false };
-    }
+    return { products: [], hasMore: false };
   }
 };
 
-// Get products by category
 export const getProductsByCategory = async (category) => {
   try {
-    const q = query(
-      collection(db, PRODUCTS_COLLECTION),
-      where('category', '==', category),
-      where('availability.is_available', '==', true)
+    const products = await fetchProductsWithFallback(
+      [
+        where('category', '==', category),
+        where('availability.is_available', '==', true)
+      ],
+      p => p.category === category && 
+           (p.availability?.is_available === true || p.availability?.is_available === undefined)
     );
-
-    const snapshot = await getDocs(q);
-    const products = snapshot.docs. map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
     return { products, hasMore: false };
   } catch (error) {
-    console. error('Get products by category error:', error);
-    
-    // Fallback
-    try {
-      const fallbackSnapshot = await getDocs(collection(db, PRODUCTS_COLLECTION));
-      const allProducts = fallbackSnapshot.docs.map(doc => ({
-        id:  doc.id,
-        ...doc.data(),
-      }));
-      
-      const filtered = allProducts.filter(p => 
-        p.category === category && 
-        (p.availability?.is_available === true || p.availability?.is_available === undefined)
-      );
-      
-      return { products: filtered, hasMore: false };
-    } catch (fallbackError) {
-      return { products: [], hasMore: false };
-    }
+    console.error('Get products by category error:', error);
+    return { products: [], hasMore: false };
   }
 };
 
-// Get single product by ID
 export const getProductById = async (productId) => {
   try {
     const productDoc = await getDoc(doc(db, PRODUCTS_COLLECTION, productId));
 
     if (productDoc.exists()) {
-      // Increment view count
       try {
         await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), {
           'metadata.views': increment(1),
           'metadata.last_viewed': serverTimestamp(),
         });
-      } catch (e) {
-        console.log('Could not update view count');
+      } catch {
+        // Silent fail for view count update
       }
 
-      return { id: productDoc. id, ...productDoc.data() };
+      return { id: productDoc.id, ...productDoc.data() };
     }
 
     return null;
@@ -265,7 +210,6 @@ export const getProductById = async (productId) => {
   }
 };
 
-// Get products by seller
 export const getSellerProducts = async (sellerId) => {
   try {
     const q = query(
@@ -274,17 +218,13 @@ export const getSellerProducts = async (sellerId) => {
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ... doc.data(),
-    }));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     console.error('Get seller products error:', error);
     return [];
   }
 };
 
-// Update product
 export const updateProduct = async (productId, updates, newImageFiles = []) => {
   try {
     const productRef = doc(db, PRODUCTS_COLLECTION, productId);
@@ -301,19 +241,17 @@ export const updateProduct = async (productId, updates, newImageFiles = []) => {
       'availability.updated_at': serverTimestamp(),
     });
   } catch (error) {
-    console. error('Update product error:', error);
+    console.error('Update product error:', error);
     throw error;
   }
 };
 
-
-// ✅ NEW: Update product quantity after purchase (supports partial purchases)
 export const updateProductQuantity = async (productId, quantityPurchased) => {
   try {
     const productRef = doc(db, PRODUCTS_COLLECTION, productId);
     const productDoc = await getDoc(productRef);
     
-    if (! productDoc.exists()) {
+    if (!productDoc.exists()) {
       throw new Error('Product not found');
     }
     
@@ -322,20 +260,15 @@ export const updateProductQuantity = async (productId, quantityPurchased) => {
     
     const updates = {
       quantity: newQuantity,
-      'availability.updated_at':  serverTimestamp(),
+      'availability.updated_at': serverTimestamp(),
     };
     
-    // If quantity reaches 0, mark as unavailable/sold
     if (newQuantity === 0) {
       updates['availability.is_available'] = false;
       updates['availability.sold_at'] = serverTimestamp();
-      updates['availability.updated_at'] = serverTimestamp();
-
     }
     
     await updateDoc(productRef, updates);
-    
-    console.log(`✅ Product ${productId}:  quantity ${currentQuantity} → ${newQuantity}`);
     
     return { 
       previousQuantity: currentQuantity, 
@@ -348,7 +281,6 @@ export const updateProductQuantity = async (productId, quantityPurchased) => {
   }
 };
 
-// Mark product as sold
 export const markProductAsSold = async (productId) => {
   try {
     await updateDoc(doc(db, PRODUCTS_COLLECTION, productId), {
@@ -362,17 +294,15 @@ export const markProductAsSold = async (productId) => {
   }
 };
 
-// Delete product
-export const deleteProduct = async (productId, sellerId) => {
+export const deleteProduct = async (productId) => {
   try {
     await deleteDoc(doc(db, PRODUCTS_COLLECTION, productId));
   } catch (error) {
-    console. error('Delete product error:', error);
+    console.error('Delete product error:', error);
     throw error;
   }
 };
 
-// Search products
 export const searchProducts = async (searchTerm) => {
   try {
     const snapshot = await getDocs(collection(db, PRODUCTS_COLLECTION));
@@ -380,7 +310,7 @@ export const searchProducts = async (searchTerm) => {
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(product =>
         (product.availability?.is_available !== false) &&
-        (product.title?. toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.description?.toLowerCase().includes(searchTerm.toLowerCase()))
       );
 
