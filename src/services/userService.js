@@ -66,8 +66,8 @@ export const updateUserProfile = async (userId, updates) => {
     // Update auth profile if display name or photo changed
     if (auth.currentUser && (updates.displayName || updates.photoURL)) {
       await updateProfile(auth.currentUser, {
-        displayName: updates. displayName,
-        photoURL: updates. photoURL,
+        displayName: updates.displayName,
+        photoURL: updates.photoURL,
       });
     }
   } catch (error) {
@@ -106,7 +106,7 @@ export const uploadUserAvatar = async (userId, file) => {
 
     // Update auth profile
     if (auth.currentUser) {
-      await updateProfile(auth. currentUser, { photoURL: url });
+      await updateProfile(auth.currentUser, { photoURL: url });
     }
 
     return url;
