@@ -8,7 +8,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase.config';
@@ -16,18 +15,17 @@ import { db } from './firebase.config';
 const SKILLS_COLLECTION = 'skills';
 const BARTER_REQUESTS_COLLECTION = 'barter_requests';
 
-// Create a new skill
 export const createSkill = async (providerId, providerInfo, skillData) => {
   try {
     const skillRef = await addDoc(collection(db, SKILLS_COLLECTION), {
       provider_id: providerId,
-      provider_name: providerInfo?. displayName || 'Anonymous',
+      provider_name: providerInfo?.displayName || 'Anonymous',
       provider_avatar: providerInfo?.photoURL || '',
-      provider_rating: providerInfo?.ratings?. averageRating || 0,
+      provider_rating: providerInfo?.ratings?.averageRating || 0,
       skill_name: skillData.skill_name,
       category: skillData.category,
-      description:  skillData.description,
-      proficiency_level: skillData. proficiency_level,
+      description: skillData.description,
+      proficiency_level: skillData.proficiency_level,
       years_experience: parseInt(skillData.years_experience) || 0,
       learning_outcomes: skillData.learning_outcomes || [],
       barter_rate: {
@@ -38,13 +36,13 @@ export const createSkill = async (providerId, providerInfo, skillData) => {
       },
       availability: {
         days_per_week: parseInt(skillData.days_per_week) || 2,
-        hours_per_session: parseFloat(skillData. hours_per_session) || 1,
-        preferred_time:  skillData.preferred_time || 'evening',
+        hours_per_session: parseFloat(skillData.hours_per_session) || 1,
+        preferred_time: skillData.preferred_time || 'evening',
         available_slots: [],
       },
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
-      is_active: true,  // IMPORTANT: This must be true! 
+      is_active: true,
       reviews_count: 0,
       average_rating: 0,
       metadata: {
@@ -54,32 +52,25 @@ export const createSkill = async (providerId, providerInfo, skillData) => {
       },
     });
 
-    return skillRef. id;
+    return skillRef.id;
   } catch (error) {
     console.error('Create skill error:', error);
     throw error;
   }
 };
 
-// Get all available skills - SIMPLIFIED QUERY
 export const getAvailableSkills = async (currentUserId = null) => {
   try {
-    // Simple query - get all skills first
     const snapshot = await getDocs(collection(db, SKILLS_COLLECTION));
     
-    let skills = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ... doc.data(),
-    }));
+    let skills = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Filter manually for active skills (not by current user)
     skills = skills.filter(skill => {
-      const isActive = skill. is_active !== false; // true if undefined or true
-      const notCurrentUser = ! currentUserId || skill.provider_id !== currentUserId;
+      const isActive = skill.is_active !== false;
+      const notCurrentUser = !currentUserId || skill.provider_id !== currentUserId;
       return isActive && notCurrentUser;
     });
 
-    console.log('Fetched skills:', skills.length); // Debug log
     return skills;
   } catch (error) {
     console.error('Get skills error:', error);
@@ -87,19 +78,14 @@ export const getAvailableSkills = async (currentUserId = null) => {
   }
 };
 
-// Get skills by category
 export const getSkillsByCategory = async (category, currentUserId = null) => {
   try {
     const snapshot = await getDocs(collection(db, SKILLS_COLLECTION));
     
-    let skills = snapshot. docs.map(doc => ({
-      id: doc.id,
-      ...doc. data(),
-    }));
+    let skills = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Filter manually
-    skills = skills. filter(skill => {
-      const matchesCategory = skill. category === category;
+    skills = skills.filter(skill => {
+      const matchesCategory = skill.category === category;
       const isActive = skill.is_active !== false;
       const notCurrentUser = !currentUserId || skill.provider_id !== currentUserId;
       return matchesCategory && isActive && notCurrentUser;
@@ -112,13 +98,12 @@ export const getSkillsByCategory = async (category, currentUserId = null) => {
   }
 };
 
-// Get single skill by ID
 export const getSkillById = async (skillId) => {
   try {
     const skillDoc = await getDoc(doc(db, SKILLS_COLLECTION, skillId));
 
     if (skillDoc.exists()) {
-      return { id: skillDoc. id, ...skillDoc.data() };
+      return { id: skillDoc.id, ...skillDoc.data() };
     }
 
     return null;
@@ -128,7 +113,6 @@ export const getSkillById = async (skillId) => {
   }
 };
 
-// Get skills by user
 export const getUserSkills = async (userId) => {
   try {
     const q = query(
@@ -137,34 +121,29 @@ export const getUserSkills = async (userId) => {
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc. id,
-      ... doc.data(),
-    }));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console. error('Get user skills error:', error);
+    console.error('Get user skills error:', error);
     return [];
   }
 };
 
-// Get skill matches based on user's skills
 export const getSkillMatches = async (userId, userSkills = []) => {
   try {
     const allSkills = await getAvailableSkills(userId);
     
-    if (! userSkills || userSkills.length === 0) {
-      return allSkills. slice(0, 5);
+    if (!userSkills || userSkills.length === 0) {
+      return allSkills.slice(0, 5);
     }
 
-    // Score each skill based on overlap with user's skills
     const scoredSkills = allSkills.map((skill) => {
       let score = 0;
       
-      const preferredSkills = skill.barter_rate?. preferred_skills || [];
+      const preferredSkills = skill.barter_rate?.preferred_skills || [];
       if (preferredSkills.length > 0) {
         const matchCount = preferredSkills.filter((pref) =>
           userSkills.some((us) => 
-            us.skill_name?. toLowerCase().includes(pref. toLowerCase()) ||
+            us.skill_name?.toLowerCase().includes(pref.toLowerCase()) ||
             pref.toLowerCase().includes(us.skill_name?.toLowerCase())
           )
         ).length;
@@ -185,7 +164,6 @@ export const getSkillMatches = async (userId, userSkills = []) => {
   }
 };
 
-// Update skill
 export const updateSkill = async (skillId, updates) => {
   try {
     await updateDoc(doc(db, SKILLS_COLLECTION, skillId), {
@@ -193,22 +171,20 @@ export const updateSkill = async (skillId, updates) => {
       updated_at: serverTimestamp(),
     });
   } catch (error) {
-    console. error('Update skill error:', error);
+    console.error('Update skill error:', error);
     throw error;
   }
 };
 
-// Delete skill
 export const deleteSkill = async (skillId) => {
   try {
     await deleteDoc(doc(db, SKILLS_COLLECTION, skillId));
   } catch (error) {
-    console. error('Delete skill error:', error);
+    console.error('Delete skill error:', error);
     throw error;
   }
 };
 
-// Create barter request
 export const createBarterRequest = async (requestData) => {
   try {
     const requestRef = await addDoc(collection(db, BARTER_REQUESTS_COLLECTION), {
@@ -220,7 +196,7 @@ export const createBarterRequest = async (requestData) => {
       provider_avatar: requestData.provider_avatar || '',
       skill_requested: {
         skill_id: requestData.skill_id,
-        skill_name: requestData. skill_name,
+        skill_name: requestData.skill_name,
         hours_needed: parseInt(requestData.hours_needed) || 1,
         learning_goal: requestData.learning_goal || '',
       },
@@ -245,39 +221,29 @@ export const createBarterRequest = async (requestData) => {
   }
 };
 
-// Get user's barter requests
 export const getUserBarterRequests = async (userId) => {
   try {
-    // Get requests where user is the requester
     const sentQuery = query(
       collection(db, BARTER_REQUESTS_COLLECTION),
       where('requester_id', '==', userId)
     );
     const sentSnapshot = await getDocs(sentQuery);
-    const sentRequests = sentSnapshot. docs.map(doc => ({
-      id: doc.id,
-      ...doc. data(),
-    }));
+    const sentRequests = sentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Get requests where user is the provider
     const receivedQuery = query(
       collection(db, BARTER_REQUESTS_COLLECTION),
       where('provider_id', '==', userId)
     );
     const receivedSnapshot = await getDocs(receivedQuery);
-    const receivedRequests = receivedSnapshot.docs.map(doc => ({
-      id:  doc.id,
-      ...doc.data(),
-    }));
+    const receivedRequests = receivedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     return { sentRequests, receivedRequests };
   } catch (error) {
     console.error('Get barter requests error:', error);
-    return { sentRequests: [], receivedRequests:  [] };
+    return { sentRequests: [], receivedRequests: [] };
   }
 };
 
-// Update barter request status
 export const updateBarterRequestStatus = async (requestId, newStatus) => {
   try {
     const updates = {
