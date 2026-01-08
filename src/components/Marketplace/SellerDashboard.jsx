@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getSellerProducts, deleteProduct } from '../../services/productService';
-import { getSellerOrders } from '../../services/orderService';
+import { getSellerOrders, sellerConfirmHandover, calculateSellerRevenue, calculatePendingRevenue } from '../../services/orderService';
 import { getUserSkills } from '../../services/skillService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatPrice, formatDate } from '../../utils/formatters';
@@ -16,6 +16,7 @@ const SellerDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [confirmingOrderId, setConfirmingOrderId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -24,7 +25,7 @@ const SellerDashboard = () => {
   const fetchData = async () => {
     try {
       const [productsData, ordersData, skillsData] = await Promise.all([
-        getSellerProducts(currentUser. uid),
+        getSellerProducts(currentUser.uid),
         getSellerOrders(currentUser.uid),
         getUserSkills(currentUser.uid).catch(() => []),
       ]);
@@ -52,16 +53,46 @@ const SellerDashboard = () => {
     }
   };
 
+  // Handle seller confirming handover
+  const handleConfirmHandover = async (orderId) => {
+    setConfirmingOrderId(orderId);
+    try {
+      await sellerConfirmHandover(orderId, currentUser.uid);
+      toast.success('Item marked as handed over!  Waiting for buyer to confirm receipt.');
+      // Refresh orders
+      const updatedOrders = await getSellerOrders(currentUser.uid);
+      setOrders(updatedOrders);
+    } catch (error) {
+      console.error('Error confirming handover:', error);
+      toast.error(error.message || 'Failed to confirm handover');
+    } finally {
+      setConfirmingOrderId(null);
+    }
+  };
+
+  // Calculate revenue directly from orders
+  const calculatedRevenue = calculateSellerRevenue(orders, currentUser. uid);
+  const pendingRevenue = calculatePendingRevenue(orders, currentUser.uid);
+
   const stats = {
     totalProducts: products.length,
-    activeProducts: products.filter(p => p.availability?. is_available).length,
+    activeProducts: products.filter(p => p. availability?. is_available).length,
     soldProducts: products.filter(p => ! p.availability?.is_available).length,
     totalSkills: skills.length,
     totalOrders: orders. length,
-    pendingOrders: orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length,
-    completedOrders:  orders.filter(o => o.status === 'completed').length,
-    totalSales: userProfile?.seller_stats?.total_sales || 0,
-    itemsSold: userProfile?.seller_stats?.products_sold || 0,
+    pendingOrders: orders.filter(o => 
+      o.status === 'waiting_for_meetup' || o.status === 'seller_confirmed'
+    ).length,
+    completedOrders: orders.filter(o => o.status === 'completed').length,
+    // Use calculated revenue instead of userProfile stats
+    totalSales: calculatedRevenue,
+    pendingSales: pendingRevenue,
+    itemsSold: orders
+      .filter(o => o.status === 'completed')
+      .reduce((sum, o) => {
+        const sellerProducts = o.products.filter(p => p.seller_id === currentUser.uid);
+        return sum + sellerProducts. reduce((s, p) => s + p.quantity, 0);
+      }, 0),
   };
 
   if (loading) {
@@ -70,7 +101,7 @@ const SellerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm: px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg: px-8">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl p-8 mb-8 text-white">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -87,7 +118,7 @@ const SellerDashboard = () => {
               </Link>
               <Link 
                 to="/post-skill" 
-                className="bg-primary-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-400 transition-colors border border-primary-400"
+                className="bg-primary-500 text-white px-4 py-2 rounded-lg font-medium hover: bg-primary-400 transition-colors border border-primary-400"
               >
                 + Post Skill
               </Link>
@@ -98,8 +129,13 @@ const SellerDashboard = () => {
         {/* Stats Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-primary-500">
-            <p className="text-sm text-gray-500 mb-1">Total Sales</p>
+            <p className="text-sm text-gray-500 mb-1">Total Earnings</p>
             <p className="text-2xl font-bold text-primary-600">{formatPrice(stats.totalSales)}</p>
+            {stats.pendingSales > 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                + {formatPrice(stats.pendingSales)} pending
+              </p>
+            )}
           </div>
           <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-green-500">
             <p className="text-sm text-gray-500 mb-1">Items Sold</p>
@@ -110,8 +146,8 @@ const SellerDashboard = () => {
             <p className="text-2xl font-bold text-blue-600">{stats. activeProducts}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-yellow-500">
-            <p className="text-sm text-gray-500 mb-1">Pending Orders</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats. pendingOrders}</p>
+            <p className="text-sm text-gray-500 mb-1">Pending Meetups</p>
+            <p className="text-2xl font-bold text-yellow-600">{stats.pendingOrders}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-purple-500">
             <p className="text-sm text-gray-500 mb-1">Skills Posted</p>
@@ -124,10 +160,10 @@ const SellerDashboard = () => {
           <div className="border-b border-gray-200">
             <nav className="flex overflow-x-auto">
               {[
-                { id:  'overview', label: 'Overview', icon: '📊' },
+                { id: 'overview', label: 'Overview', icon: '📊' },
                 { id: 'products', label: 'My Products', icon: '📦', count: products.length },
                 { id:  'orders', label: 'Orders Received', icon: '📋', count: orders.length },
-                { id: 'skills', label: 'My Skills', icon: '🎯', count:  skills.length },
+                { id: 'skills', label: 'My Skills', icon: '🎯', count: skills. length },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -172,20 +208,22 @@ const SellerDashboard = () => {
                   ) : (
                     <div className="space-y-3">
                       {orders.slice(0, 3).map(order => {
-                        const status = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
+                        const status = ORDER_STATUSES[order.status] || ORDER_STATUSES. pending;
                         return (
                           <div key={order.id} className="bg-white p-3 rounded-lg">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">#{order.id. slice(-6)}</span>
                               <span className={`text-xs px-2 py-1 rounded-full ${
-                                order. status === 'completed' ? 'bg-green-100 text-green-700' :
+                                order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                order.status === 'seller_confirmed' ? 'bg-orange-100 text-orange-700' : 
+                                order.status === 'waiting_for_meetup' ? 'bg-purple-100 text-purple-700' : 
                                 order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                                 'bg-blue-100 text-blue-700'
                               }`}>
-                                {status.name}
+                                {status. name}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-500 mt-1">{formatPrice(order.order_summary?.total_amount)}</p>
+                            <p className="text-sm text-gray-500 mt-1">{formatPrice(order.order_summary?. total_amount)}</p>
                           </div>
                         );
                       })}
@@ -199,12 +237,12 @@ const SellerDashboard = () => {
                     <h3 className="font-semibold text-gray-900">Active Products</h3>
                     <button 
                       onClick={() => setActiveTab('products')}
-                      className="text-sm text-primary-600 hover:text-primary-700"
+                      className="text-sm text-primary-600 hover: text-primary-700"
                     >
                       View All →
                     </button>
                   </div>
-                  {products. filter(p => p. availability?.is_available).length === 0 ? (
+                  {products.filter(p => p. availability?.is_available).length === 0 ? (
                     <p className="text-gray-500 text-sm">No active products</p>
                   ) : (
                     <div className="space-y-3">
@@ -213,13 +251,12 @@ const SellerDashboard = () => {
                           <img
                             src={product.images?.[0]?.url || 'https://via.placeholder.com/40'}
                             alt={product.title}
-                            className="w-10 h-10 rounded object-cover"
+                            className="w-10 h-10 object-cover rounded"
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{product. title}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{product. title}</p>
                             <p className="text-xs text-gray-500">{formatPrice(product.price)}</p>
                           </div>
-                          <span className="text-xs text-gray-400">Qty: {product.quantity}</span>
                         </div>
                       ))}
                     </div>
@@ -251,9 +288,9 @@ const SellerDashboard = () => {
                             className="w-16 h-16 object-cover rounded-lg"
                           />
                           <div>
-                            <h4 className="font-medium text-gray-900">{product. title}</h4>
+                            <h4 className="font-medium text-gray-900">{product.title}</h4>
                             <p className="text-sm text-gray-500">
-                              {formatPrice(product.price)} • Qty: {product. quantity}
+                              {formatPrice(product.price)} • Qty: {product.quantity}
                             </p>
                             <span className={`inline-flex items-center text-xs mt-1 ${product.availability?.is_available ? 'text-green-600' : 'text-red-600'}`}>
                               <span className={`w-2 h-2 rounded-full mr-1 ${product.availability?. is_available ? 'bg-green-500' : 'bg-red-500'}`}></span>
@@ -263,23 +300,18 @@ const SellerDashboard = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Link
-                            to={`/product/${product. id}`}
+                            to={`/product/${product.id}`}
                             className="p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
                             title="View"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
+                            👁️
                           </Link>
                           <button
                             onClick={() => handleDeleteProduct(product. id)}
-                            className="p-2 text-gray-500 hover: text-red-600 hover:bg-white rounded-lg transition-colors"
+                            className="p-2 text-gray-500 hover: text-red-600 hover: bg-white rounded-lg transition-colors"
                             title="Delete"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-. 867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            🗑️
                           </button>
                         </div>
                       </div>
@@ -292,7 +324,7 @@ const SellerDashboard = () => {
             {/* Orders Tab */}
             {activeTab === 'orders' && (
               <div>
-                {orders.length === 0 ? (
+                {orders. length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-5xl mb-4">📋</div>
                     <h3 className="text-lg font-medium text-gray-900">No orders received yet</h3>
@@ -302,6 +334,9 @@ const SellerDashboard = () => {
                   <div className="space-y-4">
                     {orders.map(order => {
                       const status = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
+                      const canConfirmHandover = order.status === 'waiting_for_meetup';
+                      const isConfirming = confirmingOrderId === order.id;
+                      
                       return (
                         <div key={order.id} className="p-5 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                           <div className="flex items-center justify-between mb-3">
@@ -311,13 +346,16 @@ const SellerDashboard = () => {
                             </div>
                             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                               order.status === 'completed' ? 'bg-green-100 text-green-700' :
-                              order.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                              order.status === 'seller_confirmed' ? 'bg-orange-100 text-orange-700' :
+                              order.status === 'waiting_for_meetup' ? 'bg-purple-100 text-purple-700' : 
                               order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                               'bg-yellow-100 text-yellow-700'
                             }`}>
-                              {status. icon} {status.name}
+                              {status.icon} {status.name}
                             </span>
                           </div>
+                          
+                          {/* Products in order */}
                           <div className="space-y-2 mb-3">
                             {order.products.map((product, idx) => (
                               <div key={idx} className="flex justify-between text-sm bg-white p-2 rounded">
@@ -326,6 +364,32 @@ const SellerDashboard = () => {
                               </div>
                             ))}
                           </div>
+                          
+                          {/* Meetup Info */}
+                          {order.meetup && (
+                            <div className="bg-white p-3 rounded-lg mb-3">
+                              <p className="text-sm font-medium text-gray-700 mb-1">📍 Meetup Location</p>
+                              <p className="text-sm text-gray-600">
+                                {order.meetup.location || order.meetup.hostel || 'Not specified'}
+                                {order.meetup.room && `, Room ${order.meetup. room}`}
+                              </p>
+                              {order.meetup. phone && (
+                                <p className="text-sm text-gray-600">📞 {order. meetup.phone}</p>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Delivery PIN (only show to seller for verification reference) */}
+                          {order.handshake?. delivery_pin && order.status !== 'completed' && (
+                            <div className="bg-blue-50 p-3 rounded-lg mb-3 border border-blue-200">
+                              <p className="text-sm font-medium text-blue-700">🔐 Delivery PIN</p>
+                              <p className="text-xs text-blue-600">
+                                Ask buyer for this PIN to verify identity:  
+                                <span className="font-mono font-bold ml-2">{order.handshake. delivery_pin}</span>
+                              </p>
+                            </div>
+                          )}
+                          
                           <div className="pt-3 border-t border-gray-200 flex flex-wrap justify-between gap-2">
                             <div className="text-sm">
                               <span className="text-gray-500">Buyer:  </span>
@@ -335,6 +399,58 @@ const SellerDashboard = () => {
                               {formatPrice(order.order_summary?.total_amount)}
                             </div>
                           </div>
+                          
+                          {/* Action Buttons */}
+                          {canConfirmHandover && (
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                              <button
+                                onClick={() => handleConfirmHandover(order.id)}
+                                disabled={isConfirming}
+                                className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                                  isConfirming
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-green-600 text-white hover:bg-green-700'
+                                }`}
+                              >
+                                {isConfirming ? (
+                                  <span className="flex items-center justify-center gap-2">
+                                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    Confirming...
+                                  </span>
+                                ) : (
+                                  '🤝 Mark as Handed Over'
+                                )}
+                              </button>
+                              <p className="text-xs text-gray-500 mt-2 text-center">
+                                Click this after you've given the item to the buyer
+                              </p>
+                            </div>
+                          )}
+                          
+                          {order.status === 'seller_confirmed' && (
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                              <div className="bg-orange-50 p-3 rounded-lg text-center">
+                                <p className="text-sm font-medium text-orange-700">⏳ Waiting for Buyer Confirmation</p>
+                                <p className="text-xs text-orange-600 mt-1">
+                                  The buyer needs to confirm they received the item
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {order.status === 'completed' && (
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                              <div className="bg-green-50 p-3 rounded-lg text-center">
+                                <p className="text-sm font-medium text-green-700">✅ Transaction Complete</p>
+                                <p className="text-xs text-green-600 mt-1">
+                                  This order has been successfully completed
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -356,24 +472,17 @@ const SellerDashboard = () => {
                     </Link>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     {skills.map(skill => (
                       <div key={skill.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-center justify-between">
                           <div>
                             <h4 className="font-medium text-gray-900">{skill.title}</h4>
-                            <p className="text-sm text-gray-500 mt-1">{skill.category}</p>
-                            <span className={`inline-block mt-2 text-xs px-2 py-1 rounded-full ${
-                              skill.level === 'beginner' ? 'bg-green-100 text-green-700' :
-                              skill.level === 'intermediate' ? 'bg-blue-100 text-blue-700' : 
-                              'bg-purple-100 text-purple-700'
-                            }`}>
-                              {skill.level}
-                            </span>
+                            <p className="text-sm text-gray-500">{skill.category}</p>
                           </div>
                           <Link
                             to={`/skill/${skill.id}`}
-                            className="text-primary-600 hover: text-primary-700 text-sm"
+                            className="text-primary-600 hover: text-primary-700 text-sm font-medium"
                           >
                             View →
                           </Link>
