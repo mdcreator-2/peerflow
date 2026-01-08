@@ -11,7 +11,7 @@ const Footer = () => {
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <Link to="/" className="flex items-center space-x-2 mb-4">
-              <span className="text-2xl">🔄</span>
+              <img src="/Logo.png" alt="PeerFlow Logo" className="h-10 w-auto" />
               <span className="text-xl font-bold text-white">PeerFlow</span>
             </Link>
             <p className="text-gray-400 text-sm max-w-md">
