@@ -15,6 +15,11 @@ import { updateProductQuantity } from './productService';
 
 const ORDERS_COLLECTION = 'orders';
 
+// Generate a 4-digit delivery PIN for handshake verification
+const generateDeliveryPin = () => {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+};
+
 export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, paymentInfo) => {
   try {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -27,15 +32,18 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
       product_name: item.title,
       price: item.price,
       quantity: item.quantity,
-      total: item.price * item.quantity,
+      total:  item.price * item.quantity,
       seller_id: item.seller_id,
       seller_name: item.seller_name,
     }));
 
-    const sellerIds = [...new Set(cartItems.map(item => item.seller_id))];
+    const sellerIds = [... new Set(cartItems.map(item => item.seller_id))];
+
+    // Generate delivery PIN for handshake verification
+    const delivery_pin = generateDeliveryPin();
 
     const orderRef = await addDoc(collection(db, ORDERS_COLLECTION), {
-      buyer_id: buyerId,
+      buyer_id:  buyerId,
       buyer_name: buyerInfo.displayName,
       buyer_email: buyerInfo.email,
       seller_ids: sellerIds,
@@ -45,32 +53,40 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
         delivery_fee: deliveryFee,
         total_amount: totalAmount,
         currency: 'INR',
-        item_count: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+        item_count: cartItems.reduce((sum, item) => sum + item. quantity, 0),
       },
-      payment: {
+      payment:  {
         method: paymentInfo.method,
         status: 'pending',
         transaction_id: null,
         payment_date: null,
       },
-      delivery: {
-        method: deliveryInfo.method,
-        pickup_location: deliveryInfo.method === 'pickup' ? deliveryInfo.pickup_location : '',
-        delivery_address: deliveryInfo.method === 'delivery' ? deliveryInfo.address : '',
+      // Updated meetup-focused delivery object
+      meetup: {
+        location: deliveryInfo.pickup_location || deliveryInfo.meetup_location || '',
         hostel: deliveryInfo.hostel || '',
-        room: deliveryInfo.room || '',
-        phone: deliveryInfo.phone || '',
+        room:  deliveryInfo.room || '',
+        phone: deliveryInfo. phone || '',
+        notes: deliveryInfo. notes || '',
         status: 'pending',
-        delivered_at: null,
+        met_at: null,
       },
-      status: 'pending',
+      // Handshake verification fields
+      handshake:  {
+        delivery_pin,
+        seller_confirmed: false,
+        seller_confirmed_at: null,
+        buyer_confirmed: false,
+        buyer_confirmed_at: null,
+      },
+      status: 'pending', // Will move to 'waiting_for_meetup' after payment
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
       completed_at: null,
       review_submitted: false,
     });
 
-    return { orderId: orderRef.id, totalAmount };
+    return { orderId: orderRef. id, totalAmount, delivery_pin };
   } catch (error) {
     console.error('Create order error:', error);
     throw error;
@@ -82,7 +98,7 @@ export const getOrderById = async (orderId) => {
     const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId));
     
     if (orderDoc.exists()) {
-      return { id: orderDoc.id, ...orderDoc.data() };
+      return { id: orderDoc.id, ...orderDoc. data() };
     }
     
     return null;
@@ -96,15 +112,15 @@ const fetchOrdersWithFallback = async (queryConstraints) => {
   try {
     const q = query(collection(db, ORDERS_COLLECTION), ...queryConstraints);
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => ({ id: doc. id, ...doc. data() }));
   } catch {
     const [whereConstraint] = queryConstraints;
     const qFallback = query(collection(db, ORDERS_COLLECTION), whereConstraint);
     const snapshot = await getDocs(qFallback);
-    const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const orders = snapshot.docs.map(doc => ({ id: doc. id, ...doc. data() }));
     
-    return orders.sort((a, b) => {
-      const aTime = a.created_at?.toMillis?.() || 0;
+    return orders. sort((a, b) => {
+      const aTime = a.created_at?. toMillis?. () || 0;
       const bTime = b.created_at?.toMillis?.() || 0;
       return bTime - aTime;
     });
@@ -146,7 +162,7 @@ export const updateOrderStatus = async (orderId, status) => {
 
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), updates);
   } catch (error) {
-    console.error('Update order status error:', error);
+    console. error('Update order status error:', error);
     throw error;
   }
 };
@@ -155,9 +171,10 @@ export const updatePaymentStatus = async (orderId, paymentData) => {
   try {
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
       'payment.status': paymentData.status,
-      'payment.transaction_id': paymentData.transaction_id || null,
-      'payment.payment_date': paymentData.status === 'completed' ? serverTimestamp() : null,
-      status: paymentData.status === 'completed' ? 'confirmed' : 'pending',
+      'payment. transaction_id': paymentData.transaction_id || null,
+      'payment.payment_date': paymentData. status === 'completed' ? serverTimestamp() : null,
+      // Move to waiting_for_meetup instead of directly completing
+      status: paymentData.status === 'completed' ?  'waiting_for_meetup' :  'pending',
       updated_at: serverTimestamp(),
     });
   } catch (error) {
@@ -166,12 +183,54 @@ export const updatePaymentStatus = async (orderId, paymentData) => {
   }
 };
 
-export const completeOrder = async (orderId) => {
+// Seller confirms they have handed over the item
+export const sellerConfirmHandover = async (orderId, sellerId) => {
   try {
     const order = await getOrderById(orderId);
     
     if (!order) throw new Error('Order not found');
+    if (! order.seller_ids.includes(sellerId)) throw new Error('Unauthorized:  Not a seller for this order');
+    if (order.status !== 'waiting_for_meetup') throw new Error('Order is not ready for handover confirmation');
 
+    await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
+      'handshake.seller_confirmed': true,
+      'handshake. seller_confirmed_at': serverTimestamp(),
+      status: 'seller_confirmed',
+      'meetup.status': 'handed_over',
+      updated_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Seller confirm handover error:', error);
+    throw error;
+  }
+};
+
+// Buyer confirms they have received the item (with optional PIN verification)
+export const buyerConfirmReceipt = async (orderId, buyerId, enteredPin = null) => {
+  try {
+    const order = await getOrderById(orderId);
+    
+    if (!order) throw new Error('Order not found');
+    if (order.buyer_id !== buyerId) throw new Error('Unauthorized: Not the buyer for this order');
+    if (order.status !== 'seller_confirmed') throw new Error('Seller has not confirmed handover yet');
+    
+    // Optional PIN verification for extra security
+    if (enteredPin && order.handshake?. delivery_pin !== enteredPin) {
+      throw new Error('Invalid delivery PIN');
+    }
+
+    // Update order to completed
+    await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
+      'handshake.buyer_confirmed': true,
+      'handshake.buyer_confirmed_at': serverTimestamp(),
+      status: 'completed',
+      'meetup.status': 'completed',
+      'meetup.met_at': serverTimestamp(),
+      completed_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    });
+
+    // Update seller stats and product quantities
     for (const product of order.products) {
       try {
         await updateProductQuantity(product.product_id, product.quantity);
@@ -188,11 +247,40 @@ export const completeOrder = async (orderId) => {
         console.error(`Failed to update seller ${product.seller_id} stats:`, sellerError);
       }
     }
+  } catch (error) {
+    console. error('Buyer confirm receipt error:', error);
+    throw error;
+  }
+};
+
+// Legacy function - now just for manual completion by admin if needed
+export const completeOrder = async (orderId) => {
+  try {
+    const order = await getOrderById(orderId);
+    
+    if (!order) throw new Error('Order not found');
+
+    for (const product of order.products) {
+      try {
+        await updateProductQuantity(product.product_id, product.quantity);
+      } catch (productError) {
+        console.error(`Failed to update product ${product.product_id}:`, productError);
+      }
+      
+      try {
+        await updateDoc(doc(db, 'users', product. seller_id), {
+          'seller_stats.products_sold': increment(product. quantity),
+          'seller_stats.total_sales': increment(product.total),
+        });
+      } catch (sellerError) {
+        console.error(`Failed to update seller ${product. seller_id} stats:`, sellerError);
+      }
+    }
 
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
       status: 'completed',
-      'delivery.status': 'delivered',
-      'delivery.delivered_at': serverTimestamp(),
+      'meetup.status': 'completed',
+      'meetup.met_at': serverTimestamp(),
       completed_at: serverTimestamp(),
       updated_at: serverTimestamp(),
     });
@@ -209,7 +297,30 @@ export const cancelOrder = async (orderId) => {
       updated_at: serverTimestamp(),
     });
   } catch (error) {
-    console.error('Cancel order error:', error);
+    console. error('Cancel order error:', error);
     throw error;
   }
+};
+
+// Calculate seller revenue from orders (for dashboard)
+export const calculateSellerRevenue = (orders, sellerId) => {
+  return orders
+    .filter(order => order.status === 'completed' || order.status === 'seller_confirmed')
+    .reduce((total, order) => {
+      // Sum up only products sold by this seller
+      const sellerProducts = order. products.filter(p => p.seller_id === sellerId);
+      const orderTotal = sellerProducts. reduce((sum, p) => sum + p.total, 0);
+      return total + orderTotal;
+    }, 0);
+};
+
+// Calculate pending revenue (orders not yet completed)
+export const calculatePendingRevenue = (orders, sellerId) => {
+  return orders
+    .filter(order => order.status === 'waiting_for_meetup' || order.status === 'seller_confirmed')
+    .reduce((total, order) => {
+      const sellerProducts = order.products.filter(p => p.seller_id === sellerId);
+      const orderTotal = sellerProducts.reduce((sum, p) => sum + p.total, 0);
+      return total + orderTotal;
+    }, 0);
 };
