@@ -206,19 +206,48 @@ Ensure your Firestore security rules allow:
 
 <div align="center">
 
-| Home | Marketplace | Skill Barter |
-|:<img width="1900" height="994" alt="image" src="https://github.com/user-attachments/assets/4d0e24c7-191e-41be-a9b2-b1f2688d9d35" />
-:|:<img width="1893" height="992" alt="image" src="https://github.com/user-attachments/assets/4c34956d-5071-497e-a467-11840ce00c1f" />
-:|:<img width="1896" height="990" alt="image" src="https://github.com/user-attachments/assets/273626a5-5fe0-476e-96c2-d28719fb3aaa" />
-:|
-| Landing page with features | Browse & filter products | Exchange skills with peers |
+### 🏠 Home & Landing
+<img width="100%" alt="Home - Landing page with features" src="https://github.com/user-attachments/assets/4d0e24c7-191e-41be-a9b2-b1f2688d9d35" />
 
-| Checkout | Order Tracking | Seller Dashboard |
-|:<img width="1895" height="991" alt="image" src="https://github.com/user-attachments/assets/9fdf3531-6101-4dd9-8e4f-5f1de9d674af" />
-:|:<img width="1890" height="990" alt="image" src="https://github.com/user-attachments/assets/ef6a0679-f82c-4b86-812f-c7a6b02c4e48" />
-:|<img width="1892" height="985" alt="image" src="https://github.com/user-attachments/assets/9ef7d7f6-21e7-481e-8803-05915d431533" />
-:|
-| Cart & payment options | PIN verification & status | Manage products & orders |
+---
+
+### 🛍️ Marketplace & Skill Barter
+
+<table>
+  <tr>
+    <td width="50%">
+      <img alt="Marketplace - Browse & filter products" src="https://github.com/user-attachments/assets/4c34956d-5071-497e-a467-11840ce00c1f" />
+      <p align="center"><b>Marketplace</b><br/>Browse & filter products</p>
+    </td>
+    <td width="50%">
+      <img alt="Skill Barter - Exchange skills with peers" src="https://github.com/user-attachments/assets/273626a5-5fe0-476e-96c2-d28719fb3aaa" />
+      <p align="center"><b>Skill Barter</b><br/>Exchange skills with peers</p>
+    </td>
+  </tr>
+</table>
+
+---
+
+### 🛒 Checkout & Orders
+
+<table>
+  <tr>
+    <td width="50%">
+      <img alt="Checkout - Cart & payment options" src="https://github.com/user-attachments/assets/9fdf3531-6101-4dd9-8e4f-5f1de9d674af" />
+      <p align="center"><b>Checkout</b><br/>Cart & payment options</p>
+    </td>
+    <td width="50%">
+      <img alt="Order Tracking - PIN verification & status" src="https://github.com/user-attachments/assets/ef6a0679-f82c-4b86-812f-c7a6b02c4e48" />
+      <p align="center"><b>Order Tracking</b><br/>PIN verification & status</p>
+    </td>
+  </tr>
+</table>
+
+---
+
+### 📊 Seller Dashboard
+<img width="100%" alt="Seller Dashboard - Manage products & orders" src="https://github.com/user-attachments/assets/9ef7d7f6-21e7-481e-8803-05915d431533" />
+<p align="center"><b>Seller Dashboard</b> - Manage products, orders & track revenue</p>
 
 </div>
 
