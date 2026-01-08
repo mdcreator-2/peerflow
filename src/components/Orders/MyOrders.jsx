@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   getUserOrders,
   buyerConfirmReceipt,
+  getOrderById,
 } from "../../services/orderService";
 import { useAuth } from "../../hooks/useAuth";
 import { formatPrice, formatDate } from "../../utils/formatters";
@@ -11,6 +12,7 @@ import { SectionLoader } from "../Common/LoadingSpinner";
 import toast from "react-hot-toast";
 
 const MyOrders = () => {
+  const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,6 @@ const MyOrders = () => {
     try {
       await buyerConfirmReceipt(orderId, currentUser.uid);
       toast.success("Item received!  Order completed successfully.");
-      // Refresh orders
       const updatedOrders = await getUserOrders(currentUser.uid);
       setOrders(updatedOrders);
     } catch (error) {
@@ -74,7 +75,6 @@ const MyOrders = () => {
       setShowPinModal(false);
       setEnteredPin("");
       setSelectedOrderId(null);
-      // Refresh orders
       const updatedOrders = await getUserOrders(currentUser.uid);
       setOrders(updatedOrders);
     } catch (error) {
@@ -82,6 +82,29 @@ const MyOrders = () => {
       toast.error(error.message || "Failed to confirm receipt");
     } finally {
       setConfirmingOrderId(null);
+    }
+  };
+
+  const handleCompletePayment = async (orderId) => {
+    try {
+      const order = await getOrderById(orderId);
+      if (!order) {
+        toast.error("Order not found");
+        return;
+      }
+
+      navigate("/payment", {
+        state: {
+          orderId: order.id,
+          amount: order.order_summary?.total_amount,
+          paymentMethod: order.payment?.method,
+          deliveryPin: order.handshake?.delivery_pin,
+          isRetryPayment: true,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching order for payment:", error);
+      toast.error("Failed to process payment.  Please try again.");
     }
   };
 
@@ -93,12 +116,22 @@ const MyOrders = () => {
 
   const filteredOrders = orders.filter((order) => {
     if (filter === "all") return true;
+    if (filter === "payment_pending") {
+      return (
+        (order.status === "payment_required" || order.status === "pending") &&
+        order.payment?.method !== "cash"
+      );
+    }
     return order.status === filter;
   });
 
   const stats = {
     total: orders.length,
-    pending: orders.filter((o) => o.status === "pending").length,
+    payment_pending: orders.filter(
+      (o) =>
+        (o.status === "payment_required" || o.status === "pending") &&
+        o.payment?.method !== "cash"
+    ).length,
     waiting_for_meetup: orders.filter((o) => o.status === "waiting_for_meetup")
       .length,
     seller_confirmed: orders.filter((o) => o.status === "seller_confirmed")
@@ -113,7 +146,7 @@ const MyOrders = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm: px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>
@@ -123,86 +156,87 @@ const MyOrders = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <button
-            onClick={() => setFilter("all")}
-            className={`p-4 rounded-lg text-center transition-colors ${
-              filter === "all"
-                ? "bg-primary-100 border-2 border-primary-500"
-                : "bg-white"
-            }`}
-          >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg p-4 shadow-sm">
             <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            <p className="text-sm text-gray-500">All Orders</p>
-          </button>
-          <button
-            onClick={() => setFilter("waiting_for_meetup")}
-            className={`p-4 rounded-lg text-center transition-colors ${
-              filter === "waiting_for_meetup"
-                ? "bg-purple-100 border-2 border-purple-500"
-                : "bg-white"
-            }`}
-          >
+            <p className="text-sm text-gray-500">Total Orders</p>
+          </div>
+          <div className="bg-white rounded-lg p-4 shadow-sm">
             <p className="text-2xl font-bold text-purple-600">
               {stats.waiting_for_meetup}
             </p>
             <p className="text-sm text-gray-500">Awaiting Meetup</p>
-          </button>
-          <button
-            onClick={() => setFilter("seller_confirmed")}
-            className={`p-4 rounded-lg text-center transition-colors ${
-              filter === "seller_confirmed"
-                ? "bg-orange-100 border-2 border-orange-500"
-                : "bg-white"
-            }`}
-          >
+          </div>
+          <div className="bg-white rounded-lg p-4 shadow-sm">
             <p className="text-2xl font-bold text-orange-600">
-              {stats.seller_confirmed}
+              {stats.payment_pending}
             </p>
-            <p className="text-sm text-gray-500">Confirm Receipt</p>
-          </button>
-          <button
-            onClick={() => setFilter("completed")}
-            className={`p-4 rounded-lg text-center transition-colors ${
-              filter === "completed"
-                ? "bg-green-100 border-2 border-green-500"
-                : "bg-white"
-            }`}
-          >
+            <p className="text-sm text-gray-500">Payment Pending</p>
+          </div>
+          <div className="bg-white rounded-lg p-4 shadow-sm">
             <p className="text-2xl font-bold text-green-600">
               {stats.completed}
             </p>
             <p className="text-sm text-gray-500">Completed</p>
-          </button>
-          <button
-            onClick={() => setFilter("cancelled")}
-            className={`p-4 rounded-lg text-center transition-colors ${
-              filter === "cancelled"
-                ? "bg-red-100 border-2 border-red-500"
-                : "bg-white"
-            }`}
-          >
-            <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
-            <p className="text-sm text-gray-500">Cancelled</p>
-          </button>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="bg-white rounded-lg shadow-sm mb-6 overflow-x-auto">
+          <div className="flex">
+            {[
+              { id: "all", label: "All", count: stats.total },
+              {
+                id: "payment_pending",
+                label: "Payment Pending",
+                count: stats.payment_pending,
+              },
+              {
+                id: "waiting_for_meetup",
+                label: "Awaiting Meetup",
+                count: stats.waiting_for_meetup,
+              },
+              {
+                id: "seller_confirmed",
+                label: "Ready to Receive",
+                count: stats.seller_confirmed,
+              },
+              { id: "completed", label: "Completed", count: stats.completed },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFilter(tab.id)}
+                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  filter === tab.id
+                    ? "border-primary-500 text-primary-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-gray-100">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Orders List */}
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
             <div className="text-5xl mb-4">📦</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-gray-900">
               {filter === "all"
                 ? "No orders yet"
                 : `No ${filter.replace("_", " ")} orders`}
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-gray-500 mt-1">
               {filter === "all"
                 ? "Start shopping to see your orders here!"
                 : "Try selecting a different filter above. "}
             </p>
             {filter === "all" && (
-              <Link to="/marketplace" className="btn-primary">
+              <Link to="/marketplace" className="btn-primary mt-4 inline-block">
                 Browse Marketplace
               </Link>
             )}
@@ -214,6 +248,12 @@ const MyOrders = () => {
                 ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
               const canConfirmReceipt = order.status === "seller_confirmed";
               const isConfirming = confirmingOrderId === order.id;
+              const isOnlinePayment = order.payment?.method !== "cash";
+              const needsPayment =
+                (order.status === "payment_required" ||
+                  order.status === "pending") &&
+                isOnlinePayment;
+              const isCashOrder = order.payment?.method === "cash";
 
               return (
                 <div
@@ -241,10 +281,14 @@ const MyOrders = () => {
                             ? "bg-purple-100 text-purple-700"
                             : order.status === "cancelled"
                             ? "bg-red-100 text-red-700"
+                            : needsPayment
+                            ? "bg-orange-100 text-orange-700"
                             : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
-                        {status.icon} {status.name}
+                        {needsPayment
+                          ? "💳 Payment Required"
+                          : `${status.icon} ${status.name}`}
                       </span>
                     </div>
                   </div>
@@ -258,9 +302,9 @@ const MyOrders = () => {
                             <span className="text-2xl">📦</span>
                           </div>
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">
+                            <p className="font-medium text-gray-900">
                               {product.product_name}
-                            </h4>
+                            </p>
                             <p className="text-sm text-gray-500">
                               Qty: {product.quantity} ×{" "}
                               {formatPrice(product.price)}
@@ -269,82 +313,87 @@ const MyOrders = () => {
                               Seller: {product.seller_name}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-900">
-                              {formatPrice(product.total)}
-                            </p>
-                          </div>
+                          <p className="font-medium text-gray-900">
+                            {formatPrice(product.total)}
+                          </p>
                         </div>
                       ))}
                     </div>
 
-                    {/* Meetup Info */}
-                    {order.meetup &&
-                      order.status !== "completed" &&
-                      order.status !== "cancelled" && (
-                        <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                          <h4 className="font-medium text-purple-800 mb-2">
-                            📍 Meetup Details
-                          </h4>
-                          <p className="text-sm text-purple-700">
-                            Location:{" "}
-                            {order.meetup.location ||
-                              order.meetup.hostel ||
-                              "Contact seller"}
-                            {order.meetup.room && `, Room ${order.meetup.room}`}
-                          </p>
-                          {order.meetup.phone && (
-                            <p className="text-sm text-purple-700">
-                              📞 {order.meetup.phone}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                    {/* Delivery PIN for Buyer */}
-                    {order.handshake?.delivery_pin &&
-                      order.status !== "completed" &&
-                      order.status !== "cancelled" && (
-                        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <h4 className="font-medium text-blue-800 mb-1">
-                            🔐 Your Delivery PIN
-                          </h4>
-                          <p className="text-2xl font-mono font-bold text-blue-700">
-                            {order.handshake.delivery_pin}
-                          </p>
-                          <p className="text-xs text-blue-600 mt-1">
-                            Share this PIN with the seller when you meet to
-                            verify your identity
-                          </p>
-                        </div>
-                      )}
-
                     {/* Order Summary */}
-                    <div className="mt-6 pt-4 border-t border-gray-100">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-500">Subtotal</span>
-                        <span>
-                          {formatPrice(order.order_summary?.subtotal)}
+                    <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+                      <div className="text-sm text-gray-500">
+                        <span className="font-medium">Payment: </span>
+                        <span
+                          className={`${
+                            isCashOrder ? "text-blue-600" : "text-green-600"
+                          }`}
+                        >
+                          {isCashOrder
+                            ? "💵 Cash on Meetup"
+                            : `${
+                                order.payment?.method === "upi" ? "📱" : "💳"
+                              } ${order.payment?.method?.toUpperCase()}`}
                         </span>
-                      </div>
-                      {order.order_summary?.delivery_fee > 0 && (
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-500">Delivery Fee</span>
-                          <span>
-                            {formatPrice(order.order_summary?.delivery_fee)}
+                        {order.payment?.status === "unpaid_cash" && (
+                          <span className="ml-2 text-yellow-600">
+                            (Pay on meetup)
                           </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-semibold text-lg mt-2 pt-2 border-t border-gray-100">
-                        <span>Total</span>
-                        <span className="text-primary-600">
+                        )}
+                        {order.payment?.status === "paid" && (
+                          <span className="ml-2 text-green-600">(Paid ✓)</span>
+                        )}
+                        {needsPayment && (
+                          <span className="ml-2 text-orange-600">
+                            (Not paid)
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-500">Total: </span>
+                        <span className="text-lg font-bold text-primary-600">
                           {formatPrice(order.order_summary?.total_amount)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Status-specific messages */}
-                    {order.status === "waiting_for_meetup" && (
+                    {/* Delivery PIN for buyer - only show when payment is done */}
+                    {order.handshake?.delivery_pin &&
+                      order.status !== "completed" &&
+                      order.status !== "cancelled" &&
+                      !needsPayment && (
+                        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-sm font-medium text-blue-800">
+                            🔐 Your Delivery PIN
+                          </p>
+                          <p className="text-2xl font-mono font-bold text-blue-700 mt-1">
+                            {order.handshake.delivery_pin}
+                          </p>
+                          <p className="text-xs text-blue-600 mt-1">
+                            Share this PIN with the seller to verify your
+                            identity during meetup
+                          </p>
+                        </div>
+                      )}
+
+                    {/* Cash Order Reminder */}
+                    {isCashOrder && order.status === "waiting_for_meetup" && (
+                      <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p className="text-sm font-medium text-yellow-800">
+                          💵 Cash Payment Required
+                        </p>
+                        <p className="text-xs text-yellow-600 mt-1">
+                          Please have{" "}
+                          <strong>
+                            {formatPrice(order.order_summary?.total_amount)}
+                          </strong>{" "}
+                          ready when you meet the seller.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Awaiting Meetup - Online Payment */}
+                    {order.status === "waiting_for_meetup" && !isCashOrder && (
                       <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
                         <p className="text-sm font-medium text-purple-800">
                           📍 Awaiting Meetup
@@ -361,11 +410,13 @@ const MyOrders = () => {
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 mb-4">
                           <p className="text-sm font-medium text-orange-800">
-                            🤝 Seller has handed over the item!{" "}
+                            🤝 Seller has handed over the item!
                           </p>
                           <p className="text-xs text-orange-600 mt-1">
                             Please confirm that you have received the item to
-                            complete this order.
+                            complete the order.
+                            {isCashOrder &&
+                              " Make sure you've paid the cash amount. "}
                           </p>
                         </div>
                         <button
@@ -407,52 +458,25 @@ const MyOrders = () => {
                       </div>
                     )}
 
-                    {/* Payment Action for Buyer if pending payment */}
-                    {order.status === "pending" && (
+                    {/* Complete Payment Action for Pending Online Orders */}
+                    {needsPayment && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 mb-4">
                           <p className="text-sm font-medium text-orange-800">
-                            You have not made the Payment!{" "}
+                            💳 Payment Required
                           </p>
                           <p className="text-xs text-orange-600 mt-1">
-                            You can pay now to complete this order.
+                            You selected online payment but haven't completed it
+                            yet. Complete your payment to proceed with the
+                            order.
                           </p>
                         </div>
                         <button
-                          onClick={() => handleConfirmPayment(order.id)}
-                          disabled={isConfirming}
-                          className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-                            isConfirming
-                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : "bg-green-600 text-white hover:bg-green-700"
-                          }`}
+                          onClick={() => handleCompletePayment(order.id)}
+                          className="w-full py-3 px-4 rounded-lg font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors"
                         >
-                          {isConfirming ? (
-                            <span className="flex items-center justify-center gap-2">
-                              <svg
-                                className="animate-spin h-5 w-5"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                  fill="none"
-                                />
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                />
-                              </svg>
-                              Confirming...
-                            </span>
-                          ) : (
-                            "✅ Confirm Payment"
-                          )}
+                          💳 Complete Payment -{" "}
+                          {formatPrice(order.order_summary?.total_amount)}
                         </button>
                       </div>
                     )}
@@ -492,40 +516,40 @@ const MyOrders = () => {
         {showPinModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">
                 🔐 Enter Delivery PIN
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                Enter the 4-digit PIN you shared with the seller to verify the
-                transaction.
+                Enter the 4-digit PIN to confirm receipt of the item.
               </p>
               <input
                 type="text"
+                maxLength="4"
                 value={enteredPin}
                 onChange={(e) =>
-                  setEnteredPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+                  setEnteredPin(e.target.value.replace(/\D/g, ""))
                 }
-                placeholder="Enter 4-digit PIN"
-                className="w-full px-4 py-3 text-center text-2xl font-mono border border-gray-300 rounded-lg focus:ring-2 focus: ring-primary-500 focus: border-transparent"
-                maxLength={4}
+                className="w-full text-center text-2xl font-mono tracking-widest border-2 border-gray-300 rounded-lg p-4 focus:border-primary-500 focus: outline-none"
+                placeholder="• • • •"
+                autoFocus
               />
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={closePinModal}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="flex-1 py-3 px-4 rounded-lg font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handlePinSubmit}
-                  disabled={enteredPin.length !== 4 || confirmingOrderId}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium ${
-                    enteredPin.length === 4 && !confirmingOrderId
-                      ? "bg-green-600 text-white hover:bg-green-700"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  disabled={confirmingOrderId}
+                  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
+                    confirmingOrderId
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-primary-600 text-white hover:bg-primary-700"
                   }`}
                 >
-                  {confirmingOrderId ? "Verifying..." : "Verify & Complete"}
+                  {confirmingOrderId ? "Verifying..." : "Confirm"}
                 </button>
               </div>
             </div>

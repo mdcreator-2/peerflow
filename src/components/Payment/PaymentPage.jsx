@@ -3,21 +3,19 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../../hooks/useCart";
 import { updatePaymentStatus } from "../../services/orderService";
 import {
-  processPayment,
   processUPIPayment,
   processCardPayment,
-  processCashPayment,
 } from "../../services/paymentService";
 import { formatPrice } from "../../utils/formatters";
 import toast from "react-hot-toast";
-// REMOVED: import { completeOrder } from '../../services/orderService';
 
 const PaymentPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { clearCart } = useCart();
 
-  const { orderId, amount, paymentMethod, deliveryPin } = location.state || {};
+  const { orderId, amount, paymentMethod, deliveryPin, isRetryPayment } =
+    location.state || {};
 
   const [loading, setLoading] = useState(false);
   const [upiId, setUpiId] = useState("");
@@ -64,24 +62,24 @@ const PaymentPage = () => {
           result = await processCardPayment(cardDetails, amount);
           break;
 
-        case "cash":
         default:
-          result = await processCashPayment(amount);
-          break;
+          toast.error("Invalid payment method");
+          setLoading(false);
+          return;
       }
 
-      // Update order payment status
-      // This will now set status to 'waiting_for_meetup' instead of 'completed'
+      // Update order payment status to 'paid' which moves order to 'waiting_for_meetup'
       await updatePaymentStatus(orderId, {
-        status: result.pending ? "pending" : "completed",
+        status: "paid",
         transaction_id: result.transaction_id,
       });
 
-      // REMOVED: completeOrder() call
-      // The order will now wait for seller handover confirmation + buyer receipt confirmation
+      // Only clear cart if this is not a retry payment (cart already cleared)
+      if (!isRetryPayment) {
+        clearCart();
+      }
 
-      // Clear cart
-      clearCart();
+      toast.success("Payment successful!");
 
       // Navigate to result page with delivery PIN info
       navigate("/payment/result", {
@@ -91,23 +89,40 @@ const PaymentPage = () => {
           transactionId: result.transaction_id,
           amount,
           method: paymentMethod,
-          message: result.message,
-          deliveryPin: deliveryPin, // Pass the delivery PIN to show on result page
+          message: result.message || "Payment completed successfully!",
+          deliveryPin: deliveryPin,
+          isCashOrder: false,
         },
+        replace: true,
       });
     } catch (error) {
       console.error("Payment error:", error);
+      toast.error(error.message || "Payment failed. Please try again.");
+
+      // Navigate to failure result page
       navigate("/payment/result", {
         state: {
           success: false,
           orderId,
           amount,
           method: paymentMethod,
-          message: error.message || "Payment failed.  Please try again.",
+          message: error.message || "Payment failed. Please try again.",
+          canRetry: true,
         },
+        replace: true,
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (isRetryPayment) {
+      // If retrying, go back to orders
+      navigate("/my-orders");
+    } else {
+      // If new order, go back to cart
+      navigate("/cart");
     }
   };
 
@@ -121,11 +136,18 @@ const PaymentPage = () => {
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-8 text-white text-center">
-            <p className="text-primary-100 text-sm mb-1">Amount to Pay</p>
+            <p className="text-primary-100 text-sm mb-1">
+              {isRetryPayment ? "Complete Your Payment" : "Amount to Pay"}
+            </p>
             <p className="text-4xl font-bold">{formatPrice(amount)}</p>
             <p className="text-primary-100 text-sm mt-2">
               Order #{orderId.slice(-8)}
             </p>
+            {isRetryPayment && (
+              <div className="mt-3 inline-block bg-white/20 px-3 py-1 rounded-full text-sm">
+                🔄 Retry Payment
+              </div>
+            )}
           </div>
 
           <div className="p-6">
@@ -256,26 +278,6 @@ const PaymentPage = () => {
               </div>
             )}
 
-            {/* Cash Payment - Updated label for campus meetup */}
-            {paymentMethod === "cash" && (
-              <div className="text-center py-6">
-                <div className="w-20 h-20 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-4xl">💵</span>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Cash on Meetup
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  Pay {formatPrice(amount)} when you meet the seller on campus.
-                </p>
-                <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    ⚠️ Please keep exact change ready for a smooth transaction.
-                  </p>
-                </div>
-              </div>
-            )}
-
             {/* Delivery PIN Info */}
             {deliveryPin && (
               <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -321,18 +323,18 @@ const PaymentPage = () => {
                   </svg>
                   Processing...
                 </>
-              ) : paymentMethod === "cash" ? (
-                "Confirm Order"
               ) : (
                 `Pay ${formatPrice(amount)}`
               )}
             </button>
 
             <button
-              onClick={() => navigate("/cart")}
+              onClick={handleCancel}
               className="w-full text-center text-sm text-gray-500 hover:text-gray-700 mt-4"
             >
-              Cancel and return to cart
+              {isRetryPayment
+                ? "Cancel and return to orders"
+                : "Cancel and return to cart"}
             </button>
           </div>
         </div>
