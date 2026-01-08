@@ -17,14 +17,14 @@ export const PRODUCT_CATEGORIES = [
 // Product Conditions
 export const PRODUCT_CONDITIONS = [
   { id:  'new', name: 'Brand New', description: 'Unused, in original packaging' },
-  { id: 'like_new', name: 'Like New', description: 'Used once or twice, excellent condition' },
+  { id: 'like_new', name:  'Like New', description: 'Used once or twice, excellent condition' },
   { id: 'good', name: 'Good', description: 'Used but well maintained' },
   { id: 'fair', name: 'Fair', description: 'Shows signs of wear but fully functional' },
 ];
 
 // Skill Categories
 export const SKILL_CATEGORIES = [
-  { id: 'academics', name: 'Academics', icon: '📖' },
+  { id:  'academics', name: 'Academics', icon: '📖' },
   { id: 'tech', name: 'Technology', icon: '💻' },
   { id: 'arts', name: 'Arts & Design', icon: '🎨' },
   { id: 'music', name: 'Music', icon: '🎵' },
@@ -47,30 +47,38 @@ export const TIME_PREFERENCES = [
   { id: 'morning', name:  'Morning', time: '6 AM - 12 PM' },
   { id: 'afternoon', name: 'Afternoon', time: '12 PM - 5 PM' },
   { id: 'evening', name:  'Evening', time: '5 PM - 9 PM' },
-  { id: 'night', name: 'Night', time: '9 PM - 12 AM' },
+  { id: 'night', name:  'Night', time: '9 PM - 12 AM' },
 ];
 
 // Hostels at NIT Patna
 export const HOSTELS = [
   { id: 'sbh', name: 'Sone Boys Hostel' },
   { id: 'gbh', name: 'Ganga Boys Hostel' },
-  { id: 'kbh', name: 'Kosi Boys Hostel' },
+  { id:  'kbh', name: 'Kosi Boys Hostel' },
   { id: 'mbh', name: 'Mandakini Boys Hostel' },
   { id: 'nbh', name: 'New Boys Hostel' },
   { id: 'gh', name: 'Girls Hostel' },
-  { id: 'ngh', name: 'New Girls Hostel' },
+  { id:  'ngh', name: 'New Girls Hostel' },
   { id: 'fq', name: 'Faculty Quarters' },
-  { id:  'other', name: 'Other' },
+  { id: 'other', name: 'Other' },
 ];
 
 // Order Statuses - Updated for P2P Campus Meetup Flow
 export const ORDER_STATUSES = {
+  payment_required: { name: 'Payment Required', color: 'orange', icon:  '💳' },
   pending: { name: 'Pending Payment', color: 'yellow', icon: '⏳' },
   confirmed: { name: 'Payment Confirmed', color:  'blue', icon: '✓' },
-  waiting_for_meetup: { name:  'Awaiting Meetup', color: 'purple', icon: '📍' },
+  waiting_for_meetup: { name: 'Awaiting Meetup', color: 'purple', icon: '📍' },
   seller_confirmed: { name: 'Seller Handed Over', color: 'orange', icon: '🤝' },
-  completed: { name: 'Completed', color: 'green', icon: '✅' },
-  cancelled: { name: 'Cancelled', color: 'red', icon: '❌' },
+  completed: { name:  'Completed', color: 'green', icon: '✅' },
+  cancelled: { name:  'Cancelled', color: 'red', icon: '❌' },
+};
+
+// Payment Statuses
+export const PAYMENT_STATUSES = {
+  paid: { name: 'Paid', color: 'green', icon: '✅' },
+  pending: { name: 'Pending', color: 'yellow', icon: '⏳' },
+  unpaid_cash:  { name: 'Cash on Meetup', color: 'blue', icon:  '💵' },
 };
 
 // Meetup Locations at NIT Patna
@@ -88,18 +96,18 @@ export const MEETUP_LOCATIONS = [
 // Barter Request Statuses
 export const BARTER_STATUSES = {
   pending:  { name: 'Pending', color:  'yellow', icon: '⏳' },
-  accepted: { name: 'Accepted', color: 'green', icon:  '✓' },
+  accepted: { name: 'Accepted', color: 'green', icon: '✓' },
   in_progress: { name: 'In Progress', color: 'blue', icon: '🔄' },
-  completed: { name:  'Completed', color: 'green', icon: '✅' },
-  cancelled: { name:  'Cancelled', color: 'red', icon: '❌' },
-  rejected: { name:  'Rejected', color: 'red', icon: '✗' },
+  completed: { name: 'Completed', color: 'green', icon:  '✅' },
+  cancelled: { name: 'Cancelled', color: 'red', icon:  '❌' },
+  rejected: { name: 'Rejected', color: 'red', icon: '✗' },
 };
 
 // Payment Methods
 export const PAYMENT_METHODS = [
-  { id: 'cash', name:  'Cash on Meetup', icon: '💵' },
-  { id: 'upi', name: 'UPI Payment', icon: '📱' },
-  { id: 'card', name: 'Credit/Debit Card', icon: '💳' },
+  { id: 'cash', name:  'Cash on Meetup', icon:  '💵' },
+  { id:  'upi', name: 'UPI Payment', icon: '📱' },
+  { id: 'card', name: 'Credit/Debit Card', icon:  '💳' },
 ];
 
 // Error Messages
@@ -120,13 +128,14 @@ export const SUCCESS_MESSAGES = {
   login: 'Welcome back! ',
   logout:  'You have been logged out.',
   product_created: 'Product listed successfully! ',
-  product_updated: 'Product updated successfully! ',
-  product_deleted: 'Product deleted successfully!',
-  skill_created:  'Skill posted successfully!',
+  product_updated: 'Product updated successfully!',
+  product_deleted:  'Product deleted successfully!',
+  skill_created: 'Skill posted successfully! ',
   skill_updated: 'Skill updated successfully!',
   order_created: 'Order placed successfully!',
+  order_created_cash: 'Order confirmed!  Please prepare cash for the meetup.',
   profile_updated: 'Profile updated successfully!',
   barter_request_sent: 'Barter request sent successfully! ',
-  seller_confirmed: 'Item handed over!  Waiting for buyer confirmation.',
-  buyer_confirmed: 'Item received! Order completed successfully.',
+  seller_confirmed: 'Item handed over! Waiting for buyer confirmation.',
+  buyer_confirmed:  'Item received!  Order completed successfully.',
 };

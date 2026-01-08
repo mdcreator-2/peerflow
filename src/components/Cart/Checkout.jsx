@@ -27,6 +27,7 @@ const Checkout = () => {
     }
     // eslint-disable-next-line
   }, [userProfile]);
+
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -66,7 +67,7 @@ const Checkout = () => {
         method: formData.paymentMethod,
       };
 
-      const { orderId, totalAmount } = await createOrder(
+      const { orderId, totalAmount, delivery_pin } = await createOrder(
         currentUser.uid,
         userProfile,
         cartItems,
@@ -74,13 +75,36 @@ const Checkout = () => {
         paymentInfo
       );
 
-      navigate("/payment", {
-        state: {
-          orderId,
-          amount: totalAmount,
-          paymentMethod: formData.paymentMethod,
-        },
-      });
+      // Different flow for Cash vs Online payment
+      if (formData.paymentMethod === "cash") {
+        // Cash on Meetup:  Clear cart and go directly to success page
+        clearCart();
+        toast.success("Order placed successfully!");
+
+        // Navigate to success page with cash order details
+        navigate("/payment/result", {
+          state: {
+            success: true,
+            orderId,
+            amount: totalAmount,
+            method: "cash",
+            message: "Order confirmed! Please prepare cash for the meetup.",
+            deliveryPin: delivery_pin,
+            isCashOrder: true,
+          },
+          replace: true, // Replace current history entry so back button doesn't go to checkout
+        });
+      } else {
+        // Online Payment: Navigate to payment page
+        navigate("/payment", {
+          state: {
+            orderId,
+            amount: totalAmount,
+            paymentMethod: formData.paymentMethod,
+            deliveryPin: delivery_pin,
+          },
+        });
+      }
     } catch (error) {
       console.error("Error creating order:", error);
       toast.error("Failed to create order. Please try again.");
@@ -103,11 +127,11 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm: px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg: px-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Checkout</h1>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 lg: grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Checkout Form */}
             <div className="lg:col-span-2 space-y-6">
               {/* Delivery Method */}
@@ -129,12 +153,14 @@ const Checkout = () => {
                       value="pickup"
                       checked={formData.deliveryMethod === "pickup"}
                       onChange={handleChange}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500"
+                      className="h-4 w-4 text-primary-600 focus: ring-primary-500"
                     />
                     <div className="ml-3">
-                      <p className="font-medium text-gray-900">Campus Pickup</p>
+                      <span className="font-medium text-gray-900">
+                        Campus Pickup
+                      </span>
                       <p className="text-sm text-gray-500">
-                        Meet seller on campus • Free
+                        Meet the seller on campus
                       </p>
                     </div>
                   </label>
@@ -143,7 +169,7 @@ const Checkout = () => {
                     className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
                       formData.deliveryMethod === "delivery"
                         ? "border-primary-500 bg-primary-50"
-                        : "border-gray-200 hover:bg-gray-50"
+                        : "border-gray-200 hover: bg-gray-50"
                     }`}
                   >
                     <input
@@ -152,83 +178,79 @@ const Checkout = () => {
                       value="delivery"
                       checked={formData.deliveryMethod === "delivery"}
                       onChange={handleChange}
-                      className="h-4 w-4 text-primary-600 focus: ring-primary-500"
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500"
                     />
                     <div className="ml-3">
-                      <p className="font-medium text-gray-900">
+                      <span className="font-medium text-gray-900">
                         Hostel Delivery
-                      </p>
+                      </span>
                       <p className="text-sm text-gray-500">
-                        Delivered to your hostel •{" "}
-                        {deliveryFee > 0 ? formatPrice(deliveryFee) : "Free"}
+                        Seller will deliver to your hostel
                       </p>
                     </div>
                   </label>
                 </div>
-                {errors.deliveryMethod && (
-                  <p className="mt-2 text-sm text-red-600">
-                    {errors.deliveryMethod}
-                  </p>
-                )}
               </div>
 
+              {/* Contact Info */}
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
-                  Additional Details
+                  Contact Information
                 </h2>
                 <div className="space-y-4">
-                  {/* Delivery Address - Show only if delivery is selected */}
-                  {formData.deliveryMethod === "delivery" && (
-                    <>
-                      <div>
-                        <label
-                          htmlFor="hostel"
-                          className="block text-sm font-medium text-gray-700"
-                        >
-                          Hostel <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          id="hostel"
-                          name="hostel"
-                          value={formData.hostel}
-                          onChange={handleChange}
-                          className={`mt-1 input-field ${
-                            errors.hostel ? "input-error" : ""
-                          }`}
-                        >
-                          <option value="">Select hostel</option>
-                          {HOSTELS.map((hostel) => (
-                            <option key={hostel.id} value={hostel.id}>
-                              {hostel.name}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.hostel && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {errors.hostel}
-                          </p>
-                        )}
-                      </div>
+                  <div>
+                    <label
+                      htmlFor="hostel"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Hostel <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="hostel"
+                      name="hostel"
+                      value={formData.hostel}
+                      onChange={handleChange}
+                      className={`mt-1 input-field ${
+                        errors.hostel ? "input-error" : ""
+                      }`}
+                    >
+                      <option value="">Select hostel</option>
+                      {HOSTELS.map((hostel) => (
+                        <option key={hostel.id} value={hostel.id}>
+                          {hostel.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.hostel && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.hostel}
+                      </p>
+                    )}
+                  </div>
 
-                      <div>
-                        <label
-                          htmlFor="room"
-                          className="block text-sm font-medium text-gray-700"
-                        >
-                          Room Number
-                        </label>
-                        <input
-                          type="text"
-                          id="room"
-                          name="room"
-                          value={formData.room}
-                          onChange={handleChange}
-                          className="mt-1 input-field"
-                          placeholder="e. g., A-101"
-                        />
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <label
+                      htmlFor="room"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Room Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="room"
+                      name="room"
+                      value={formData.room}
+                      onChange={handleChange}
+                      className={`mt-1 input-field ${
+                        errors.room ? "input-error" : ""
+                      }`}
+                      placeholder="e.g., 101"
+                    />
+                    {errors.room && (
+                      <p className="mt-1 text-sm text-red-600">{errors.room}</p>
+                    )}
+                  </div>
+
                   <div>
                     <label
                       htmlFor="phone"
@@ -247,7 +269,7 @@ const Checkout = () => {
                       }`}
                       placeholder="10-digit mobile number"
                       maxLength="10"
-                      autoComplete
+                      autoComplete="tel"
                     />
                     {errors.phone && (
                       <p className="mt-1 text-sm text-red-600">
@@ -270,7 +292,7 @@ const Checkout = () => {
                       className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors ${
                         formData.paymentMethod === method.id
                           ? "border-primary-500 bg-primary-50"
-                          : "border-gray-200 hover: bg-gray-50"
+                          : "border-gray-200 hover:bg-gray-50"
                       }`}
                     >
                       <input
@@ -295,11 +317,22 @@ const Checkout = () => {
                     {errors.paymentMethod}
                   </p>
                 )}
+
+                {/* Cash on Meetup Info */}
+                {formData.paymentMethod === "cash" && (
+                  <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <p className="text-sm text-yellow-800">
+                      <strong>💵 Cash on Meetup: </strong> You'll pay the seller
+                      directly when you meet on campus. Please have exact change
+                      ready.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Order Summary Sidebar */}
-            <div className="lg: col-span-1">
+            <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-md p-6 sticky top-24">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
                   Order Summary
@@ -381,22 +414,14 @@ const Checkout = () => {
                       </svg>
                       Processing...
                     </>
+                  ) : formData.paymentMethod === "cash" ? (
+                    `Place Order - ${formatPrice(total)}`
                   ) : (
-                    `Pay ${formatPrice(total)}`
+                    `Proceed to Pay ${formatPrice(total)}`
                   )}
                 </button>
 
-                {/* Back to Cart Link */}
-                <button
-                  type="button"
-                  onClick={() => navigate("/cart")}
-                  className="w-full text-center text-sm text-gray-500 hover:text-gray-700 mt-4"
-                >
-                  ← Back to Cart
-                </button>
-
-                {/* Security Note */}
-                <div className="mt-4 flex items-center justify-center text-xs text-gray-400">
+                <div className="flex items-center justify-center mt-4 text-xs text-gray-500">
                   <svg
                     className="w-4 h-4 mr-1"
                     fill="currentColor"

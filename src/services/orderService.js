@@ -17,19 +17,19 @@ const ORDERS_COLLECTION = 'orders';
 
 // Generate a 4-digit delivery PIN for handshake verification
 const generateDeliveryPin = () => {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+  return Math.floor(1000 + Math. random() * 9000).toString();
 };
 
 export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, paymentInfo) => {
   try {
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const subtotal = cartItems. reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const deliveryFee = deliveryInfo.method === 'delivery' ? 
       cartItems.reduce((sum, item) => sum + (item.delivery_fee || 0), 0) : 0;
     const totalAmount = subtotal + deliveryFee;
 
     const products = cartItems.map(item => ({
-      product_id: item.id,
-      product_name: item.title,
+      product_id: item. id,
+      product_name: item. title,
       price: item.price,
       quantity: item.quantity,
       total:  item.price * item.quantity,
@@ -42,9 +42,14 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
     // Generate delivery PIN for handshake verification
     const delivery_pin = generateDeliveryPin();
 
+    // Determine initial status based on payment method
+    const isCashPayment = paymentInfo.method === 'cash';
+    const initialPaymentStatus = isCashPayment ? 'unpaid_cash' : 'pending';
+    const initialOrderStatus = isCashPayment ? 'waiting_for_meetup' : 'payment_required';
+
     const orderRef = await addDoc(collection(db, ORDERS_COLLECTION), {
-      buyer_id:  buyerId,
-      buyer_name: buyerInfo.displayName,
+      buyer_id: buyerId,
+      buyer_name: buyerInfo. displayName,
       buyer_email: buyerInfo.email,
       seller_ids: sellerIds,
       products,
@@ -56,8 +61,8 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
         item_count: cartItems.reduce((sum, item) => sum + item. quantity, 0),
       },
       payment:  {
-        method: paymentInfo.method,
-        status: 'pending',
+        method:  paymentInfo.method, // 'cash' | 'upi' | 'card' (online)
+        status: initialPaymentStatus, // 'paid' | 'pending' | 'unpaid_cash'
         transaction_id: null,
         payment_date: null,
       },
@@ -65,7 +70,7 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
       meetup: {
         location: deliveryInfo.pickup_location || deliveryInfo.meetup_location || '',
         hostel: deliveryInfo.hostel || '',
-        room:  deliveryInfo.room || '',
+        room: deliveryInfo. room || '',
         phone: deliveryInfo. phone || '',
         notes: deliveryInfo. notes || '',
         status: 'pending',
@@ -79,14 +84,14 @@ export const createOrder = async (buyerId, buyerInfo, cartItems, deliveryInfo, p
         buyer_confirmed: false,
         buyer_confirmed_at: null,
       },
-      status: 'pending', // Will move to 'waiting_for_meetup' after payment
+      status: initialOrderStatus, // 'payment_required' | 'waiting_for_meetup' | 'completed'
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
       completed_at: null,
       review_submitted: false,
     });
 
-    return { orderId: orderRef. id, totalAmount, delivery_pin };
+    return { orderId: orderRef. id, totalAmount, delivery_pin, paymentMethod: paymentInfo.method };
   } catch (error) {
     console.error('Create order error:', error);
     throw error;
@@ -98,7 +103,7 @@ export const getOrderById = async (orderId) => {
     const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId));
     
     if (orderDoc.exists()) {
-      return { id: orderDoc.id, ...orderDoc. data() };
+      return { id: orderDoc.id, ... orderDoc.data() };
     }
     
     return null;
@@ -112,7 +117,7 @@ const fetchOrdersWithFallback = async (queryConstraints) => {
   try {
     const q = query(collection(db, ORDERS_COLLECTION), ...queryConstraints);
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc. id, ...doc. data() }));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch {
     const [whereConstraint] = queryConstraints;
     const qFallback = query(collection(db, ORDERS_COLLECTION), whereConstraint);
@@ -121,7 +126,7 @@ const fetchOrdersWithFallback = async (queryConstraints) => {
     
     return orders. sort((a, b) => {
       const aTime = a.created_at?. toMillis?. () || 0;
-      const bTime = b.created_at?.toMillis?.() || 0;
+      const bTime = b. created_at?.toMillis?.() || 0;
       return bTime - aTime;
     });
   }
@@ -172,9 +177,9 @@ export const updatePaymentStatus = async (orderId, paymentData) => {
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
       'payment.status': paymentData.status,
       'payment. transaction_id': paymentData.transaction_id || null,
-      'payment.payment_date': paymentData. status === 'completed' ? serverTimestamp() : null,
-      // Move to waiting_for_meetup instead of directly completing
-      status: paymentData.status === 'completed' ?  'waiting_for_meetup' :  'pending',
+      'payment.payment_date': paymentData. status === 'paid' ? serverTimestamp() : null,
+      // Move to waiting_for_meetup when payment is successful
+      status: paymentData.status === 'paid' ?  'waiting_for_meetup' :  'payment_required',
       updated_at: serverTimestamp(),
     });
   } catch (error) {
@@ -194,7 +199,7 @@ export const sellerConfirmHandover = async (orderId, sellerId) => {
 
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
       'handshake.seller_confirmed': true,
-      'handshake. seller_confirmed_at': serverTimestamp(),
+      'handshake.seller_confirmed_at': serverTimestamp(),
       status: 'seller_confirmed',
       'meetup.status': 'handed_over',
       updated_at: serverTimestamp(),
@@ -219,6 +224,11 @@ export const buyerConfirmReceipt = async (orderId, buyerId, enteredPin = null) =
       throw new Error('Invalid delivery PIN');
     }
 
+    // If it was cash payment, mark as paid now
+    const paymentUpdate = order.payment?.status === 'unpaid_cash' 
+      ? { 'payment.status':  'paid', 'payment.payment_date': serverTimestamp() }
+      : {};
+
     // Update order to completed
     await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
       'handshake.buyer_confirmed': true,
@@ -228,6 +238,7 @@ export const buyerConfirmReceipt = async (orderId, buyerId, enteredPin = null) =
       'meetup.met_at': serverTimestamp(),
       completed_at: serverTimestamp(),
       updated_at: serverTimestamp(),
+      ...paymentUpdate,
     });
 
     // Update seller stats and product quantities
@@ -241,7 +252,7 @@ export const buyerConfirmReceipt = async (orderId, buyerId, enteredPin = null) =
       try {
         await updateDoc(doc(db, 'users', product.seller_id), {
           'seller_stats.products_sold': increment(product.quantity),
-          'seller_stats.total_sales': increment(product.total),
+          'seller_stats. total_sales': increment(product.total),
         });
       } catch (sellerError) {
         console.error(`Failed to update seller ${product.seller_id} stats:`, sellerError);
@@ -307,8 +318,7 @@ export const calculateSellerRevenue = (orders, sellerId) => {
   return orders
     .filter(order => order.status === 'completed' || order.status === 'seller_confirmed')
     .reduce((total, order) => {
-      // Sum up only products sold by this seller
-      const sellerProducts = order. products.filter(p => p.seller_id === sellerId);
+      const sellerProducts = order.products. filter(p => p.seller_id === sellerId);
       const orderTotal = sellerProducts. reduce((sum, p) => sum + p.total, 0);
       return total + orderTotal;
     }, 0);
@@ -319,7 +329,7 @@ export const calculatePendingRevenue = (orders, sellerId) => {
   return orders
     .filter(order => order.status === 'waiting_for_meetup' || order.status === 'seller_confirmed')
     .reduce((total, order) => {
-      const sellerProducts = order.products.filter(p => p.seller_id === sellerId);
+      const sellerProducts = order.products. filter(p => p.seller_id === sellerId);
       const orderTotal = sellerProducts.reduce((sum, p) => sum + p.total, 0);
       return total + orderTotal;
     }, 0);
